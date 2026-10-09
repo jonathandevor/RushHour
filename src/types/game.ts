@@ -46,3 +46,11 @@ export interface PuzzlePreset {
   minMoves: number;
   vehicles: Vehicle[];
 }
+
+export interface ActiveDragState {
+  type: VehicleType;
+  orientation: Orientation;
+  offsetX: number;
+  offsetY: number;
+  vehicleId?: string;
+}

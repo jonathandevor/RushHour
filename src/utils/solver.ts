@@ -46,6 +46,11 @@ export function isValidPlacement(
 ): boolean {
   const len = candidate.type === 'car' ? 2 : 3;
 
+  // If placing or relocating the target Red Car, it must be on row 2 horizontally
+  if (ignoreId === 'red' && candidate.row !== 2) {
+    return false;
+  }
+
   // Check board boundary
   if (candidate.orientation === 'horizontal') {
     if (candidate.row < 0 || candidate.row >= 6) return false;

@@ -11,6 +11,8 @@ interface SetupPaletteProps {
   onDone: () => void;
   onClearBoard: () => void;
   hasRedCar: boolean;
+  onDragStartTemplate?: (dragState: { type: VehicleType; orientation: Orientation; offsetX: number; offsetY: number }) => void;
+  onDragEndTemplate?: () => void;
 }
 
 interface PaletteItem {
@@ -61,17 +63,36 @@ const PALETTE_TEMPLATES: PaletteItem[] = [
 export const SetupPalette: React.FC<SetupPaletteProps> = ({
   onDone,
   onClearBoard,
+  onDragStartTemplate,
+  onDragEndTemplate,
 }) => {
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>, item: PaletteItem) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const offsetX = e.clientX - rect.left;
+    const offsetY = e.clientY - rect.top;
+
     e.dataTransfer.setData(
       'application/json',
       JSON.stringify({
         type: item.type,
         orientation: item.orientation,
         isNew: true,
+        offsetX,
+        offsetY,
       })
     );
     e.dataTransfer.effectAllowed = 'copy';
+
+    onDragStartTemplate?.({
+      type: item.type,
+      orientation: item.orientation,
+      offsetX,
+      offsetY,
+    });
+  };
+
+  const handleDragEnd = () => {
+    onDragEndTemplate?.();
   };
 
   return (
@@ -85,6 +106,7 @@ export const SetupPalette: React.FC<SetupPaletteProps> = ({
         <div
           draggable
           onDragStart={(e) => handleDragStart(e, PALETTE_TEMPLATES[0])}
+          onDragEnd={handleDragEnd}
           className="cursor-grab active:cursor-grabbing hover:scale-[1.02] transition-transform rounded-xl border border-white/20 shadow-md overflow-hidden relative flex items-center justify-between px-3"
           style={{
             width: `${PALETTE_TEMPLATES[0].widthPx}px`,
@@ -106,6 +128,7 @@ export const SetupPalette: React.FC<SetupPaletteProps> = ({
         <div
           draggable
           onDragStart={(e) => handleDragStart(e, PALETTE_TEMPLATES[1])}
+          onDragEnd={handleDragEnd}
           className="cursor-grab active:cursor-grabbing hover:scale-[1.02] transition-transform rounded-xl border border-white/20 shadow-md overflow-hidden relative flex items-center justify-between px-3"
           style={{
             width: `${PALETTE_TEMPLATES[1].widthPx}px`,
@@ -134,6 +157,7 @@ export const SetupPalette: React.FC<SetupPaletteProps> = ({
           <div
             draggable
             onDragStart={(e) => handleDragStart(e, PALETTE_TEMPLATES[2])}
+            onDragEnd={handleDragEnd}
             className="cursor-grab active:cursor-grabbing hover:scale-[1.02] transition-transform rounded-xl border border-white/20 shadow-md overflow-hidden relative flex flex-col items-center justify-between py-3"
             style={{
               width: `${PALETTE_TEMPLATES[2].widthPx}px`,
@@ -155,6 +179,7 @@ export const SetupPalette: React.FC<SetupPaletteProps> = ({
           <div
             draggable
             onDragStart={(e) => handleDragStart(e, PALETTE_TEMPLATES[3])}
+            onDragEnd={handleDragEnd}
             className="cursor-grab active:cursor-grabbing hover:scale-[1.02] transition-transform rounded-xl border border-white/20 shadow-md overflow-hidden relative flex flex-col items-center justify-between py-3"
             style={{
               width: `${PALETTE_TEMPLATES[3].widthPx}px`,

@@ -10,8 +10,6 @@ interface NavbarProps {
   isMuted: boolean;
   onToggleMute: () => void;
   onOpenRules: () => void;
-  onOpenPresets: () => void;
-  onEnterSetup: () => void;
   mode: 'SETUP' | 'PLAY';
 }
 
@@ -19,8 +17,6 @@ export const Navbar: React.FC<NavbarProps> = ({
   isMuted,
   onToggleMute,
   onOpenRules,
-  onOpenPresets,
-  onEnterSetup,
   mode,
 }) => {
   return (
@@ -35,28 +31,17 @@ export const Navbar: React.FC<NavbarProps> = ({
         </span>
       </div>
 
-      {/* Zone 2: Nav Links (Clean single-line links) */}
-      <nav className="hidden md:flex items-center gap-6 text-xs font-medium text-slate-400">
+      {/* Zone 2: Nav Links (Clean single-line links & mode label) */}
+      <nav className="flex items-center gap-4 sm:gap-6 text-xs font-medium text-slate-400">
         <button
           onClick={onOpenRules}
           className="hover:text-white transition-colors whitespace-nowrap shrink-0 cursor-pointer"
         >
           Rules
         </button>
-        <button
-          onClick={onOpenPresets}
-          className="hover:text-white transition-colors whitespace-nowrap shrink-0 cursor-pointer"
-        >
-          Preset Puzzles
-        </button>
-        <button
-          onClick={onEnterSetup}
-          className={`transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
-            mode === 'SETUP' ? 'text-emerald-400 font-semibold' : 'hover:text-white'
-          }`}
-        >
-          Board Builder
-        </button>
+        <span className="text-emerald-400 font-semibold whitespace-nowrap shrink-0 select-none">
+          {mode === 'SETUP' ? 'Board Builder' : 'Play Mode'}
+        </span>
       </nav>
 
       {/* Zone 3: 1 Primary Action (Audio Mute Toggle) */}

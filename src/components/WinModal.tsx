@@ -129,8 +129,8 @@ export const WinModal: React.FC<WinModalProps> = ({
 
           <button
             onClick={onEditSetup}
-            className="py-3 px-3 rounded-xl font-medium text-sm bg-slate-800/60 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-700 flex items-center justify-center transition-all"
-            title="Edit puzzle in setup mode"
+            className="py-3 px-3 rounded-xl font-medium text-sm bg-slate-800/60 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-700 flex items-center justify-center transition-all cursor-pointer"
+            aria-label="Edit puzzle in setup mode"
           >
             <Settings2 className="w-4 h-4" />
           </button>

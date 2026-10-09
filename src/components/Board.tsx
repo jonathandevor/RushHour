@@ -16,8 +16,12 @@ interface BoardProps {
   nextMove: SolverStep | null;
   onMoveOneStep: (vehicleId: string, direction: MoveDirection) => boolean;
   onPlaceVehicle: (vehicle: { type: VehicleType; orientation: Orientation; row: number; col: number }) => void;
+  onRelocateVehicle?: (vehicleId: string, row: number, col: number) => void;
   onRemoveVehicle: (vehicleId: string) => void;
   isWinningSequence: boolean;
+  activeDragState?: { type: VehicleType; orientation: Orientation; offsetX: number; offsetY: number; vehicleId?: string } | null;
+  onDragStartExisting?: (dragState: { type: VehicleType; orientation: Orientation; vehicleId: string; offsetX: number; offsetY: number }) => void;
+  onDragEndExisting?: () => void;
 }
 
 export const Board: React.FC<BoardProps> = ({
@@ -26,8 +30,12 @@ export const Board: React.FC<BoardProps> = ({
   nextMove,
   onMoveOneStep,
   onPlaceVehicle,
+  onRelocateVehicle,
   onRemoveVehicle,
   isWinningSequence,
+  activeDragState,
+  onDragStartExisting,
+  onDragEndExisting,
 }) => {
   const boardRef = useRef<HTMLDivElement>(null);
   const [dragOverCells, setDragOverCells] = useState<{
@@ -40,51 +48,40 @@ export const Board: React.FC<BoardProps> = ({
   const BOARD_PIXEL_SIZE = 6 * CELL_SIZE; // 432px
   const BROWN_LINE_COLOR = '#8B5A2B'; // Straight brown grid line color
 
-  // Drag over handler for Setup mode
+  // Drag over handler for Setup mode: calculates exact anchor so marked squares alight perfectly under the dragged vehicle
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     if (mode !== 'SETUP' || !boardRef.current) return;
     e.preventDefault();
-    e.dataTransfer.dropEffect = 'copy';
+    e.dataTransfer.dropEffect = activeDragState?.vehicleId ? 'move' : 'copy';
 
     const rect = boardRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
-    const col = Math.floor(x / CELL_SIZE);
-    const row = Math.floor(y / CELL_SIZE);
+    const offsetX = activeDragState?.offsetX ?? (CELL_SIZE / 2);
+    const offsetY = activeDragState?.offsetY ?? (CELL_SIZE / 2);
 
-    if (row < 0 || row >= 6 || col < 0 || col >= 6) {
-      setDragOverCells(null);
-      return;
+    const type = activeDragState?.type ?? 'car';
+    const orientation = activeDragState?.orientation ?? 'horizontal';
+    const ignoreId = activeDragState?.vehicleId;
+
+    // Math.round((coord - offset) / CELL_SIZE) aligns the marked squares directly underneath the dragged vehicle ghost
+    const col = Math.round((x - offsetX) / CELL_SIZE);
+    const row = Math.round((y - offsetY) / CELL_SIZE);
+
+    const len = type === 'car' ? 2 : 3;
+    const valid = isValidPlacement({ row, col, orientation, type }, vehicles, ignoreId);
+
+    const candidateCells: Array<{ row: number; col: number }> = [];
+    for (let i = 0; i < len; i++) {
+      const r = orientation === 'vertical' ? row + i : row;
+      const c = orientation === 'horizontal' ? col + i : col;
+      if (r >= 0 && r < 6 && c >= 0 && c < 6) {
+        candidateCells.push({ row: r, col: c });
+      }
     }
 
-    try {
-      const dataStr = e.dataTransfer.getData('application/json');
-      let type: VehicleType = 'car';
-      let orientation: Orientation = 'horizontal';
-
-      if (dataStr) {
-        const parsed = JSON.parse(dataStr);
-        type = parsed.type;
-        orientation = parsed.orientation;
-      }
-
-      const len = type === 'car' ? 2 : 3;
-      const valid = isValidPlacement({ row, col, orientation, type }, vehicles);
-
-      const candidateCells: Array<{ row: number; col: number }> = [];
-      for (let i = 0; i < len; i++) {
-        const r = orientation === 'vertical' ? row + i : row;
-        const c = orientation === 'horizontal' ? col + i : col;
-        if (r >= 0 && r < 6 && c >= 0 && c < 6) {
-          candidateCells.push({ row: r, col: c });
-        }
-      }
-
-      setDragOverCells({ cells: candidateCells, isValid: valid });
-    } catch {
-      // Fallback
-    }
+    setDragOverCells({ cells: candidateCells, isValid: valid });
   };
 
   const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
@@ -101,27 +98,38 @@ export const Board: React.FC<BoardProps> = ({
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
-    const col = Math.floor(x / CELL_SIZE);
-    const row = Math.floor(y / CELL_SIZE);
-
-    if (row < 0 || row >= 6 || col < 0 || col >= 6) return;
+    let type: VehicleType = activeDragState?.type ?? 'car';
+    let orientation: Orientation = activeDragState?.orientation ?? 'horizontal';
+    let offsetX = activeDragState?.offsetX ?? (CELL_SIZE / 2);
+    let offsetY = activeDragState?.offsetY ?? (CELL_SIZE / 2);
+    let vehicleId = activeDragState?.vehicleId;
 
     try {
       const dataStr = e.dataTransfer.getData('application/json');
-      if (!dataStr) return;
-      const { type, orientation } = JSON.parse(dataStr) as {
-        type: VehicleType;
-        orientation: Orientation;
-      };
-
-      if (isValidPlacement({ row, col, orientation, type }, vehicles)) {
-        soundManager.playSnapSound();
-        onPlaceVehicle({ type, orientation, row, col });
-      } else {
-        soundManager.playBlockedSound();
+      if (dataStr) {
+        const parsed = JSON.parse(dataStr);
+        if (parsed.type) type = parsed.type;
+        if (parsed.orientation) orientation = parsed.orientation;
+        if (typeof parsed.offsetX === 'number') offsetX = parsed.offsetX;
+        if (typeof parsed.offsetY === 'number') offsetY = parsed.offsetY;
+        if (parsed.vehicleId) vehicleId = parsed.vehicleId;
       }
     } catch {
-      // Drop parse error
+      // Fallback
+    }
+
+    const col = Math.round((x - offsetX) / CELL_SIZE);
+    const row = Math.round((y - offsetY) / CELL_SIZE);
+
+    if (isValidPlacement({ row, col, orientation, type }, vehicles, vehicleId)) {
+      soundManager.playSnapSound();
+      if (vehicleId && onRelocateVehicle) {
+        onRelocateVehicle(vehicleId, row, col);
+      } else {
+        onPlaceVehicle({ type, orientation, row, col });
+      }
+    } else {
+      soundManager.playBlockedSound();
     }
   };
 
@@ -260,6 +268,8 @@ export const Board: React.FC<BoardProps> = ({
                 onMoveOneStep={onMoveOneStep}
                 onRemove={onRemoveVehicle}
                 isExitingWin={v.isTarget && isWinningSequence}
+                onDragStartExisting={onDragStartExisting}
+                onDragEndExisting={onDragEndExisting}
               />
             ))}
           </div>

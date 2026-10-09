@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useRef } from 'react';
-import { Vehicle, GameMode, MoveDirection, SolverStep } from '../types/game';
+import { Vehicle, GameMode, MoveDirection, SolverStep, VehicleType, Orientation } from '../types/game';
 import { ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Trash2 } from 'lucide-react';
 
 interface VehiclePieceProps {
@@ -16,6 +16,8 @@ interface VehiclePieceProps {
   onMoveOneStep: (vehicleId: string, direction: MoveDirection) => boolean;
   onRemove?: (vehicleId: string) => void;
   isExitingWin?: boolean;
+  onDragStartExisting?: (dragState: { type: VehicleType; orientation: Orientation; vehicleId: string; offsetX: number; offsetY: number }) => void;
+  onDragEndExisting?: () => void;
 }
 
 export const VehiclePiece: React.FC<VehiclePieceProps> = ({
@@ -27,6 +29,8 @@ export const VehiclePiece: React.FC<VehiclePieceProps> = ({
   onMoveOneStep,
   onRemove,
   isExitingWin = false,
+  onDragStartExisting,
+  onDragEndExisting,
 }) => {
   const [hoveredHalf, setHoveredHalf] = useState<'first' | 'second' | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -45,7 +49,40 @@ export const VehiclePiece: React.FC<VehiclePieceProps> = ({
   const isHintVehicle = mode === 'PLAY' && nextMove?.vehicleId === vehicle.id;
   const hintDirection = isHintVehicle ? nextMove?.direction : null;
 
-  // Handle pointer down for both half-clicks and tactile dragging
+  // HTML5 Drag handlers for repositioning on the board in Setup mode
+  const handleDragStartSetup = (e: React.DragEvent<HTMLDivElement>) => {
+    if (mode !== 'SETUP') return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const offsetX = e.clientX - rect.left;
+    const offsetY = e.clientY - rect.top;
+
+    e.dataTransfer.setData(
+      'application/json',
+      JSON.stringify({
+        type: vehicle.type,
+        orientation: vehicle.orientation,
+        vehicleId: vehicle.id,
+        isExisting: true,
+        offsetX,
+        offsetY,
+      })
+    );
+    e.dataTransfer.effectAllowed = 'move';
+
+    onDragStartExisting?.({
+      type: vehicle.type,
+      orientation: vehicle.orientation,
+      vehicleId: vehicle.id,
+      offsetX,
+      offsetY,
+    });
+  };
+
+  const handleDragEndSetup = () => {
+    onDragEndExisting?.();
+  };
+
+  // Handle pointer down for both half-clicks and tactile dragging in PLAY mode
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (mode === 'SETUP') return;
     e.preventDefault();
@@ -119,16 +156,14 @@ export const VehiclePiece: React.FC<VehiclePieceProps> = ({
       role="button"
       tabIndex={0}
       aria-label={`${isRed ? 'Target Red Car' : `${vehicle.type} ${vehicle.color}`}, at row ${vehicle.row + 1}, col ${vehicle.col + 1}`}
+      draggable={mode === 'SETUP'}
+      onDragStart={handleDragStartSetup}
+      onDragEnd={handleDragEndSetup}
       onPointerDown={handlePointerDown}
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerCancel}
-      onClick={(e) => {
-        if (mode === 'SETUP' && onRemove) {
-          e.stopPropagation();
-          onRemove(vehicle.id);
-        }
-      }}
-      className={`absolute select-none cursor-pointer transition-all duration-200 ease-out z-10 p-[3px] group
+      className={`absolute select-none pointer-events-auto transition-all duration-200 ease-out z-10 p-[3px] group
+        ${mode === 'SETUP' ? 'cursor-grab active:cursor-grabbing hover:z-20' : 'cursor-pointer'}
         ${isExitingWin ? 'translate-x-24 opacity-0 scale-95 transition-all duration-700 ease-in' : ''}
       `}
       style={{
@@ -136,7 +171,7 @@ export const VehiclePiece: React.FC<VehiclePieceProps> = ({
         top: `${topPx}px`,
         width: `${widthPx}px`,
         height: `${heightPx}px`,
-        touchAction: 'none',
+        touchAction: mode === 'SETUP' ? 'auto' : 'none',
       }}
     >
       {/* Main Vehicle Body Frame */}
@@ -206,12 +241,19 @@ export const VehiclePiece: React.FC<VehiclePieceProps> = ({
         )}
 
         {/* Setup Mode Delete Affordance */}
-        {mode === 'SETUP' && (
-          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-[1px] opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity rounded-xl">
-            <span className="flex items-center gap-1 text-[11px] font-medium text-white bg-red-600/90 px-2 py-0.5 rounded shadow">
-              <Trash2 className="w-3 h-3" /> Remove
-            </span>
-          </div>
+        {mode === 'SETUP' && onRemove && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              onRemove(vehicle.id);
+            }}
+            className="absolute top-1 right-1 w-6 h-6 rounded-full bg-rose-600/90 hover:bg-rose-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-md z-30 cursor-pointer"
+            aria-label="Remove vehicle"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
         )}
 
         {/* Play Mode: Half-side Click Hover Affordance Indicators */}
@@ -282,13 +324,11 @@ export const VehiclePiece: React.FC<VehiclePieceProps> = ({
               <>
                 <div
                   className="w-1/2 h-full cursor-w-resize"
-                  title="Click to move 1 space left"
                   onMouseEnter={() => setHoveredHalf('first')}
                   onMouseLeave={() => setHoveredHalf(null)}
                 />
                 <div
                   className="w-1/2 h-full cursor-e-resize"
-                  title="Click to move 1 space right"
                   onMouseEnter={() => setHoveredHalf('second')}
                   onMouseLeave={() => setHoveredHalf(null)}
                 />
@@ -297,13 +337,11 @@ export const VehiclePiece: React.FC<VehiclePieceProps> = ({
               <div className="w-full h-full flex flex-col pointer-events-auto">
                 <div
                   className="w-full h-1/2 cursor-n-resize"
-                  title="Click to move 1 space up"
                   onMouseEnter={() => setHoveredHalf('first')}
                   onMouseLeave={() => setHoveredHalf(null)}
                 />
                 <div
                   className="w-full h-1/2 cursor-s-resize"
-                  title="Click to move 1 space down"
                   onMouseEnter={() => setHoveredHalf('second')}
                   onMouseLeave={() => setHoveredHalf(null)}
                 />

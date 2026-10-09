@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useMemo, useCallback } from 'react';
-import { Vehicle, GameMode, MoveDirection, SolverResult, PuzzlePreset, VehicleType, Orientation } from './types/game';
+import { Vehicle, GameMode, MoveDirection, SolverResult, PuzzlePreset, VehicleType, Orientation, ActiveDragState } from './types/game';
 import { CLASSIC_PRESETS, VEHICLE_COLOR_PALETTE } from './data/presets';
 import { solveBoardBFS, canMoveOneStep, isValidPlacement } from './utils/solver';
 import { soundManager } from './utils/audio';
@@ -36,13 +36,16 @@ const INITIAL_RED_CAR: Vehicle = {
 };
 
 export default function App() {
-  // Game State: Starts in 'SETUP' mode as required
+  // Game State: Always starts in 'SETUP' (Board Builder) mode with no vehicles on the board
   const [mode, setMode] = useState<GameMode>('SETUP');
-  const [vehicles, setVehicles] = useState<Vehicle[]>([INITIAL_RED_CAR]);
-  const [initialSnapshot, setInitialSnapshot] = useState<Vehicle[]>([INITIAL_RED_CAR]);
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [initialSnapshot, setInitialSnapshot] = useState<Vehicle[]>([]);
   const [moveHistory, setMoveHistory] = useState<Vehicle[][]>([]);
   const [moveCount, setMoveCount] = useState<number>(0);
   const [activePreset, setActivePreset] = useState<PuzzlePreset | null>(null);
+
+  // Active dragging state for aligning preview squares with cursor and vehicle dimensions
+  const [activeDragState, setActiveDragState] = useState<ActiveDragState | null>(null);
 
   // Audio & Modals
   const [isMuted, setIsMuted] = useState<boolean>(false);
@@ -167,6 +170,14 @@ export default function App() {
     };
 
     setVehicles((prev) => [...prev, created]);
+    setActivePreset(null);
+  };
+
+  // Relocate an existing vehicle to a new position on the board
+  const handleRelocateVehicle = (vehicleId: string, newRow: number, newCol: number) => {
+    setVehicles((prev) =>
+      prev.map((v) => (v.id === vehicleId ? { ...v, row: newRow, col: newCol } : v))
+    );
     setActivePreset(null);
   };
 
@@ -308,88 +319,65 @@ export default function App() {
         isMuted={isMuted}
         onToggleMute={handleToggleMute}
         onOpenRules={() => setShowRulesModal(true)}
-        onOpenPresets={() => {
-          setMode('SETUP');
-        }}
-        onEnterSetup={handleEnterSetup}
         mode={mode}
       />
 
       {/* Main Game Stage */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 flex flex-col items-center justify-center">
-        {/* Top Play HUD / Status Banner */}
-        <div className="w-full max-w-4xl mb-4 sm:mb-6 flex flex-wrap items-center justify-between gap-4 bg-slate-900/60 border border-slate-800/80 rounded-2xl px-4 sm:px-6 py-3 shadow-lg">
-          {/* Mode Pill */}
-          <div className="flex items-center gap-3">
-            <span
-              className={`text-xs font-bold px-2.5 py-1 rounded-lg tracking-wider uppercase ${
-                mode === 'SETUP'
-                  ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
-                  : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
-              }`}
-            >
-              {mode === 'SETUP' ? 'Board Builder' : 'Play Mode'}
-            </span>
-
-            {activePreset && mode === 'PLAY' && (
-              <span className="text-xs text-slate-400 hidden sm:inline">
-                Preset: <strong className="text-white font-medium">{activePreset.title}</strong>
-              </span>
-            )}
-          </div>
-
-          {/* Play Mode Counters & Solver Telemetry */}
+      <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 flex flex-col items-center justify-start pt-4 sm:pt-6">
+        {/* Top Play HUD / Fixed-Height Header Space (Same vertical height in both modes) */}
+        <div className="w-full max-w-4xl h-14 mb-6 flex items-center justify-between">
           {mode === 'PLAY' ? (
-            <div className="flex items-center gap-6">
-              <div className="flex items-center gap-2 text-xs text-slate-400">
-                <span>Moves:</span>
-                <span className="font-mono text-base font-bold text-white tabular-nums">
-                  {moveCount}
+            <div className="w-full flex flex-wrap items-center justify-between gap-4 bg-slate-900/60 border border-slate-800/80 rounded-2xl px-4 sm:px-6 py-2.5 shadow-lg">
+              {/* Mode Pill */}
+              <div className="flex items-center gap-3">
+                <span className="text-xs font-bold px-2.5 py-1 rounded-lg tracking-wider uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                  Play Mode
                 </span>
-              </div>
 
-              <div className="flex items-center gap-2 text-xs">
-                {solverResult.solvable ? (
-                  <span className="flex items-center gap-1.5 text-emerald-400">
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span>
-                      {solverResult.minMoves === 0 ? (
-                        'Escaped!'
-                      ) : (
-                        <>
-                          <strong className="font-mono font-bold tabular-nums">
-                            {solverResult.minMoves}
-                          </strong>{' '}
-                          moves to solve
-                        </>
-                      )}
-                    </span>
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-1.5 text-rose-400">
-                    <AlertTriangle className="w-4 h-4" />
-                    <span>Unsolvable board</span>
+                {activePreset && (
+                  <span className="text-xs text-slate-400 hidden sm:inline">
+                    Preset: <strong className="text-white font-medium">{activePreset.title}</strong>
                   </span>
                 )}
               </div>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleClearBoard}
-                className="py-1.5 px-3 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-rose-400 border border-slate-700 text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
-                title="Clear all vehicles from board"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                <span>Clear Board</span>
-              </button>
-            </div>
-          )}
 
-          {/* Quick Action Controls */}
-          <div className="flex items-center gap-2">
-            {mode === 'PLAY' && (
-              <>
+              {/* Play Mode Counters & Solver Telemetry */}
+              <div className="flex items-center gap-6">
+                <div className="flex items-center gap-2 text-xs text-slate-400">
+                  <span>Moves:</span>
+                  <span className="font-mono text-base font-bold text-white tabular-nums">
+                    {moveCount}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2 text-xs">
+                  {solverResult.solvable ? (
+                    <span className="flex items-center gap-1.5 text-emerald-400">
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>
+                        {solverResult.minMoves === 0 ? (
+                          'Escaped!'
+                        ) : (
+                          <>
+                            <strong className="font-mono font-bold tabular-nums">
+                              {solverResult.minMoves}
+                            </strong>{' '}
+                            moves to solve
+                          </>
+                        )}
+                      </span>
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-1.5 text-rose-400">
+                      <AlertTriangle className="w-4 h-4" />
+                      <span>Unsolvable board</span>
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Quick Action Controls */}
+              <div className="flex items-center gap-2">
                 <button
                   onClick={() => setShowHints(!showHints)}
                   className={`p-2 rounded-lg border text-xs flex items-center gap-1.5 transition-colors cursor-pointer ${
@@ -397,7 +385,6 @@ export default function App() {
                       ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-sm'
                       : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-white'
                   }`}
-                  title={showHints ? 'Hints enabled (showing arrow)' : 'Hints hidden'}
                 >
                   <Lightbulb className="w-3.5 h-3.5" />
                   <span className="hidden sm:inline">Hints {showHints ? 'On' : 'Off'}</span>
@@ -407,7 +394,6 @@ export default function App() {
                   onClick={handleUndoMove}
                   disabled={moveHistory.length === 0}
                   className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:pointer-events-none text-slate-300 hover:text-white border border-slate-700 transition-colors flex items-center gap-1 text-xs cursor-pointer"
-                  title="Undo last move"
                 >
                   <Undo2 className="w-3.5 h-3.5" />
                   <span className="hidden sm:inline">Undo</span>
@@ -416,7 +402,6 @@ export default function App() {
                 <button
                   onClick={handleRestartPuzzle}
                   className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-colors flex items-center gap-1 text-xs cursor-pointer"
-                  title="Restart from initial puzzle state"
                 >
                   <RotateCcw className="w-3.5 h-3.5" />
                   <span className="hidden sm:inline">Restart</span>
@@ -425,107 +410,46 @@ export default function App() {
                 <button
                   onClick={handleEnterSetup}
                   className="py-1.5 px-3 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
-                  title="Return to Board Builder"
                 >
                   <Settings2 className="w-3.5 h-3.5 text-slate-400" />
                   <span>Board Builder</span>
                 </button>
-              </>
-            )}
-
-            {mode === 'SETUP' && (
-              <button
-                onClick={handleDoneSetup}
-                className="py-1.5 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-md cursor-pointer"
-              >
-                <Play className="w-3.5 h-3.5 fill-current" />
-                <span>Play</span>
-              </button>
-            )}
-          </div>
+              </div>
+            </div>
+          ) : (
+            <div className="w-full h-14" />
+          )}
         </div>
 
-        {/* Board and Palette Workspace */}
-        <div className="w-full flex flex-col lg:flex-row items-center lg:items-start justify-center gap-8">
-          {/* Setup Palette (Shown on the left in SETUP mode) */}
-          {mode === 'SETUP' ? (
-            <SetupPalette
-              onDone={handleDoneSetup}
-              onClearBoard={handleClearBoard}
-              hasRedCar={hasRedCar}
-            />
-          ) : (
-            // Play Mode Side Card: Solver AI Info & Live Hint Card
-            <div className="w-full lg:w-72 bg-slate-900/80 border border-slate-800 rounded-2xl p-5 flex flex-col gap-4 shadow-xl backdrop-blur-sm shrink-0">
-              <div>
-                <span className="text-xs font-semibold tracking-wider text-amber-400 uppercase flex items-center gap-1">
-                  <Lightbulb className="w-3.5 h-3.5" />
-                  <span>Real-time AI Hint</span>
-                </span>
-                <h3 className="text-base font-bold text-white tracking-tight mt-0.5">
-                  Optimal Move Guide
-                </h3>
+        {/* Board and Palette Workspace - Exactly identical coordinates in both modes */}
+        <div className="w-full flex items-center justify-center relative">
+          <div className="relative flex flex-col items-center">
+            {/* Setup Palette (Positioned to the left of the board in SETUP mode) */}
+            {mode === 'SETUP' && (
+              <div className="absolute right-[calc(100%+24px)] top-0">
+                <SetupPalette
+                  onDone={handleDoneSetup}
+                  onClearBoard={handleClearBoard}
+                  hasRedCar={hasRedCar}
+                  onDragStartTemplate={setActiveDragState}
+                  onDragEndTemplate={() => setActiveDragState(null)}
+                />
               </div>
+            )}
 
-              {solverResult.solvable && solverResult.nextMove ? (
-                <div className="bg-slate-800/80 border border-slate-700/80 rounded-xl p-3.5 flex flex-col gap-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-slate-400">Next Step:</span>
-                    <span className="text-xs font-bold text-amber-300 uppercase tracking-wide">
-                      Slide {solverResult.nextMove.direction}
-                    </span>
-                  </div>
-
-                  <p className="text-xs text-slate-300 leading-relaxed">
-                    Look for the <strong>pulsing arrow</strong> inside the highlighted vehicle.
-                  </p>
-
-                  <div className="pt-2 border-t border-slate-700/60 flex items-center justify-between text-[11px] text-slate-400">
-                    <span>Remaining moves:</span>
-                    <span className="font-mono font-bold text-white tabular-nums">
-                      {solverResult.minMoves} steps
-                    </span>
-                  </div>
-                </div>
-              ) : solverResult.minMoves === 0 ? (
-                <div className="bg-emerald-950/40 border border-emerald-800/60 rounded-xl p-3.5 text-xs text-emerald-300">
-                  Escape path is clear! Slide the Red Car right to exit.
-                </div>
-              ) : (
-                <div className="bg-rose-950/40 border border-rose-800/60 rounded-xl p-3.5 text-xs text-rose-300">
-                  Current vehicle placement has no solution. Tap &quot;Board Builder&quot; to adjust vehicles.
-                </div>
-              )}
-
-              {/* Controls guide */}
-              <div className="bg-slate-950/40 border border-slate-800/80 rounded-xl p-3 text-[11px] text-slate-400 flex flex-col gap-1.5">
-                <span className="font-semibold text-slate-300">How to Move:</span>
-                <span>• Click left/right half of horizontal vehicles</span>
-                <span>• Click top/bottom half of vertical vehicles</span>
-                <span>• Or click & drag smoothly along axis</span>
-              </div>
-
-              {/* Switch to Setup */}
-              <button
-                onClick={handleEnterSetup}
-                className="w-full py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 text-xs font-medium flex items-center justify-center gap-2 transition-colors cursor-pointer"
-              >
-                <Settings2 className="w-3.5 h-3.5" />
-                <span>Return to Board Builder</span>
-              </button>
-            </div>
-          )}
-
-          {/* The 6x6 Game Board with Straight Brown Line Overlay */}
-          <div className="flex flex-col items-center">
+            {/* The 6x6 Game Board with Straight Brown Line Overlay */}
             <Board
               vehicles={vehicles}
               mode={mode}
               nextMove={showHints ? solverResult.nextMove : null}
               onMoveOneStep={handleMoveOneStep}
               onPlaceVehicle={handlePlaceVehicle}
+              onRelocateVehicle={handleRelocateVehicle}
               onRemoveVehicle={handleRemoveVehicle}
               isWinningSequence={isWinningSequence}
+              activeDragState={activeDragState}
+              onDragStartExisting={setActiveDragState}
+              onDragEndExisting={() => setActiveDragState(null)}
             />
           </div>
         </div>
