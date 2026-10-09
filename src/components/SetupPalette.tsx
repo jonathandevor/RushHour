@@ -204,22 +204,22 @@ export const SetupPalette: React.FC<SetupPaletteProps> = ({
         </div>
       </div>
 
-      {/* Control Buttons: Done & Clear Board */}
+      {/* Control Buttons: Clear Board & Play */}
       <div className="w-full flex flex-col gap-2 pt-2 border-t border-slate-800">
-        <button
-          onClick={onDone}
-          className="w-full py-2.5 px-4 rounded-xl font-semibold text-xs bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-950/40 flex items-center justify-center gap-2 transition-all active:scale-[0.98] cursor-pointer"
-        >
-          <Play className="w-3.5 h-3.5 fill-current" />
-          <span>Done</span>
-        </button>
-
         <button
           onClick={onClearBoard}
           className="w-full py-2.5 px-4 rounded-xl font-medium text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-rose-400 border border-slate-700/80 flex items-center justify-center gap-2 transition-all active:scale-[0.98] cursor-pointer"
         >
           <Trash2 className="w-3.5 h-3.5" />
           <span>Clear Board</span>
+        </button>
+
+        <button
+          onClick={onDone}
+          className="w-full py-2.5 px-4 rounded-xl font-semibold text-xs bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-950/40 flex items-center justify-center gap-2 transition-all active:scale-[0.98] cursor-pointer"
+        >
+          <Play className="w-3.5 h-3.5 fill-current" />
+          <span>Play</span>
         </button>
       </div>
     </aside>

@@ -298,9 +298,6 @@ export const Board: React.FC<BoardProps> = ({
                   EXIT
                 </span>
               </div>
-              <span className="text-[8px] font-mono text-amber-200 tracking-tight leading-none mt-0.5">
-                ROW 3
-              </span>
             </div>
           </div>
         </div>
