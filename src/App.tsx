@@ -419,7 +419,6 @@ export default function App() {
         optimalMoves={startingOptimalMoves}
         puzzleTitle={activePreset?.title}
         onPlayAgain={handleRestartPuzzle}
-        onEditSetup={handleEnterSetup}
       />
 
       {/* Rules & Help Modal */}

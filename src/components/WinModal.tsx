@@ -6,7 +6,7 @@
 import React, { useEffect } from 'react';
 import confetti from 'canvas-confetti';
 import { soundManager } from '../utils/audio';
-import { Trophy, RotateCcw, Settings2 } from 'lucide-react';
+import { Trophy, RotateCcw } from 'lucide-react';
 
 interface WinModalProps {
   isOpen: boolean;
@@ -14,7 +14,6 @@ interface WinModalProps {
   optimalMoves: number;
   puzzleTitle?: string;
   onPlayAgain: () => void;
-  onEditSetup: () => void;
 }
 
 export const WinModal: React.FC<WinModalProps> = ({
@@ -23,7 +22,6 @@ export const WinModal: React.FC<WinModalProps> = ({
   optimalMoves,
   puzzleTitle,
   onPlayAgain,
-  onEditSetup,
 }) => {
   useEffect(() => {
     if (isOpen) {
@@ -107,22 +105,12 @@ export const WinModal: React.FC<WinModalProps> = ({
 
         {/* Action Buttons */}
         <div className="w-full flex flex-col sm:flex-row gap-2.5">
-
-
           <button
             onClick={onPlayAgain}
-            className="flex-1 py-3 px-4 rounded-xl font-medium text-sm bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 flex items-center justify-center gap-2 transition-all active:scale-95"
+            className="w-full py-3 px-4 rounded-xl font-medium text-sm bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 flex items-center justify-center gap-2 transition-all active:scale-95"
           >
             <RotateCcw className="w-4 h-4" />
             <span>Play Again</span>
-          </button>
-
-          <button
-            onClick={onEditSetup}
-            className="py-3 px-3 rounded-xl font-medium text-sm bg-slate-800/60 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-700 flex items-center justify-center transition-all cursor-pointer"
-            aria-label="Edit puzzle in setup mode"
-          >
-            <Settings2 className="w-4 h-4" />
           </button>
         </div>
       </div>
