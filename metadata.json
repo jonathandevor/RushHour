@@ -1,0 +1,6 @@
+{
+  "name": "Rush Hour - Traffic Puzzle Solver",
+  "description": "Tactical sliding-block traffic puzzle game with custom board builder, drag-and-drop vehicles, and real-time BFS solver AI.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
