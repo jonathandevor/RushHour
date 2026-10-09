@@ -84,6 +84,19 @@ export default function App() {
     setShowWinModal(false);
   };
 
+  // Return to SETUP mode from win screen and restart board to start of play state
+  const handleEditSetupFromWin = () => {
+    soundManager.playClickSound();
+    if (initialSnapshot.length > 0) {
+      setVehicles(JSON.parse(JSON.stringify(initialSnapshot)));
+    }
+    setMoveHistory([]);
+    setMoveCount(0);
+    setMode('SETUP');
+    setIsWinningSequence(false);
+    setShowWinModal(false);
+  };
+
   // Place a new vehicle from palette onto board
   const handlePlaceVehicle = (newVeh: {
     type: VehicleType;
@@ -419,6 +432,7 @@ export default function App() {
         optimalMoves={startingOptimalMoves}
         puzzleTitle={activePreset?.title}
         onPlayAgain={handleRestartPuzzle}
+        onEditSetup={handleEditSetupFromWin}
       />
 
       {/* Rules & Help Modal */}
