@@ -92,18 +92,7 @@ export const WinModal: React.FC<WinModalProps> = ({
           </div>
         </div>
 
-        {/* Accuracy Callout */}
-        <div className="w-full bg-slate-800/40 rounded-xl px-4 py-2.5 mb-6 text-xs text-slate-300 flex items-center justify-center gap-2">
-          {isOptimal ? (
-            <span className="text-emerald-400 font-semibold">
-              Masterclass! You solved this in the fewest moves possible.
-            </span>
-          ) : (
-            <span>
-              Solved in <strong className="text-white">{totalMoves}</strong> moves (optimal path was {optimalMoves} moves).
-            </span>
-          )}
-        </div>
+
 
         {/* Action Buttons */}
         <div className="w-full flex flex-col sm:flex-row gap-2.5">
