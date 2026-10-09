@@ -102,8 +102,8 @@ export function canMoveOneStep(
     }
     if (direction === 'right') {
       const targetCol = vehicle.col + len;
-      // If red car is exiting through row 2, col 5
-      if (vehicle.isTarget && vehicle.row === 2 && vehicle.col === 4) {
+      // If any car is exiting through row 2, col 5
+      if (vehicle.type === 'car' && vehicle.row === 2 && vehicle.orientation === 'horizontal' && vehicle.col === 4) {
         return true; // Exiting move is legal
       }
       if (targetCol >= 6) return false;
@@ -145,19 +145,26 @@ function isCellOccupied(row: number, col: number, vehicles: Vehicle[], ignoreVeh
  * the exact first move for the optimal path.
  */
 export function solveBoardBFS(vehicles: Vehicle[]): SolverResult {
-  const redIndex = vehicles.findIndex((v) => v.isTarget);
-  if (redIndex === -1) {
+  let carIndex = vehicles.findIndex(
+    (v) => v.isTarget && v.type === 'car' && v.row === 2 && v.orientation === 'horizontal'
+  );
+  if (carIndex === -1) {
+    carIndex = vehicles.findIndex(
+      (v) => v.type === 'car' && v.row === 2 && v.orientation === 'horizontal'
+    );
+  }
+  if (carIndex === -1) {
     return { solvable: false, minMoves: 0, nextMove: null };
   }
 
-  const redCar = vehicles[redIndex];
+  const targetCar = vehicles[carIndex];
   // Target vehicle must be horizontal on row 2
-  if (redCar.row !== 2 || redCar.orientation !== 'horizontal') {
+  if (targetCar.row !== 2 || targetCar.orientation !== 'horizontal' || targetCar.type !== 'car') {
     return { solvable: false, minMoves: 0, nextMove: null };
   }
 
   // If already at exit or exited:
-  if (redCar.col >= 5) {
+  if (targetCar.col >= 5) {
     return { solvable: true, minMoves: 0, nextMove: null, fullPath: [] };
   }
 
@@ -212,15 +219,14 @@ export function solveBoardBFS(vehicles: Vehicle[]): SolverResult {
   const startStateStr = encodeState(initialPositions);
 
   // If already winning:
-  if (initialPositions[redIndex] === 4) {
+  if (initialPositions[carIndex] === 4) {
     // Check if exiting move is open (col 4 -> 5)
     const grid = getGridFromPositions(initialPositions);
-    // On row 2, col 4 & 5 are red car, exit is to the right
     return {
       solvable: true,
       minMoves: 1,
-      nextMove: { vehicleId: ids[redIndex], direction: 'right', distance: 1 },
-      fullPath: [{ vehicleId: ids[redIndex], direction: 'right', distance: 1 }],
+      nextMove: { vehicleId: ids[carIndex], direction: 'right', distance: 1 },
+      fullPath: [{ vehicleId: ids[carIndex], direction: 'right', distance: 1 }],
       visitedNodesCount: 1,
     };
   }
@@ -250,10 +256,10 @@ export function solveBoardBFS(vehicles: Vehicle[]): SolverResult {
     const curKey = current.key;
 
     // Check if goal reached in this state:
-    // Red car is at col 4 (it occupies cols 4 and 5 on row 2, so 1 more right move clears the board!)
-    if (curPos[redIndex] === 4) {
+    // Car is at col 4 (it occupies cols 4 and 5 on row 2, so 1 more right move clears the board!)
+    if (curPos[carIndex] === 4) {
       winningKey = curKey;
-      exitFinalStep = { vehicleId: ids[redIndex], direction: 'right', distance: 1 };
+      exitFinalStep = { vehicleId: ids[carIndex], direction: 'right', distance: 1 };
       break;
     }
 
@@ -304,10 +310,10 @@ export function solveBoardBFS(vehicles: Vehicle[]): SolverResult {
             };
             visitedMap.set(nextKey, { prevStateKey: curKey, step });
 
-            // Quick goal check if red car reached col 4
-            if (i === redIndex && nextPos[redIndex] === 4) {
+            // Quick goal check if car reached col 4
+            if (i === carIndex && nextPos[carIndex] === 4) {
               winningKey = nextKey;
-              exitFinalStep = { vehicleId: ids[redIndex], direction: 'right', distance: 1 };
+              exitFinalStep = { vehicleId: ids[carIndex], direction: 'right', distance: 1 };
               break;
             }
 

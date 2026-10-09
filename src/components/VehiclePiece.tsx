@@ -323,12 +323,12 @@ export const VehiclePiece: React.FC<VehiclePieceProps> = ({
             {isH ? (
               <>
                 <div
-                  className="w-1/2 h-full cursor-w-resize"
+                  className="w-1/2 h-full cursor-pointer"
                   onMouseEnter={() => setHoveredHalf('first')}
                   onMouseLeave={() => setHoveredHalf(null)}
                 />
                 <div
-                  className="w-1/2 h-full cursor-e-resize"
+                  className="w-1/2 h-full cursor-pointer"
                   onMouseEnter={() => setHoveredHalf('second')}
                   onMouseLeave={() => setHoveredHalf(null)}
                 />
@@ -336,12 +336,12 @@ export const VehiclePiece: React.FC<VehiclePieceProps> = ({
             ) : (
               <div className="w-full h-full flex flex-col pointer-events-auto">
                 <div
-                  className="w-full h-1/2 cursor-n-resize"
+                  className="w-full h-1/2 cursor-pointer"
                   onMouseEnter={() => setHoveredHalf('first')}
                   onMouseLeave={() => setHoveredHalf(null)}
                 />
                 <div
-                  className="w-full h-1/2 cursor-s-resize"
+                  className="w-full h-1/2 cursor-pointer"
                   onMouseEnter={() => setHoveredHalf('second')}
                   onMouseLeave={() => setHoveredHalf(null)}
                 />

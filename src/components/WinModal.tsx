@@ -6,7 +6,7 @@
 import React, { useEffect } from 'react';
 import confetti from 'canvas-confetti';
 import { soundManager } from '../utils/audio';
-import { Trophy, RotateCcw, ArrowRight, Settings2 } from 'lucide-react';
+import { Trophy, RotateCcw, Settings2 } from 'lucide-react';
 
 interface WinModalProps {
   isOpen: boolean;
@@ -14,7 +14,6 @@ interface WinModalProps {
   optimalMoves: number;
   puzzleTitle?: string;
   onPlayAgain: () => void;
-  onNextPuzzle?: () => void;
   onEditSetup: () => void;
 }
 
@@ -24,7 +23,6 @@ export const WinModal: React.FC<WinModalProps> = ({
   optimalMoves,
   puzzleTitle,
   onPlayAgain,
-  onNextPuzzle,
   onEditSetup,
 }) => {
   useEffect(() => {
@@ -109,15 +107,7 @@ export const WinModal: React.FC<WinModalProps> = ({
 
         {/* Action Buttons */}
         <div className="w-full flex flex-col sm:flex-row gap-2.5">
-          {onNextPuzzle && (
-            <button
-              onClick={onNextPuzzle}
-              className="flex-1 py-3 px-4 rounded-xl font-semibold text-sm bg-red-600 hover:bg-red-500 text-white shadow-lg shadow-red-950/50 flex items-center justify-center gap-2 transition-all active:scale-95"
-            >
-              <span>Next Puzzle</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
-          )}
+
 
           <button
             onClick={onPlayAgain}

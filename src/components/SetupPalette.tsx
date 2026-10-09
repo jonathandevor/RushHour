@@ -5,11 +5,12 @@
 
 import React from 'react';
 import { VehicleType, Orientation } from '../types/game';
-import { Play, Trash2 } from 'lucide-react';
+import { Play, Trash2, Shuffle } from 'lucide-react';
 
 interface SetupPaletteProps {
   onDone: () => void;
   onClearBoard: () => void;
+  onRandom: () => void;
   hasRedCar: boolean;
   onDragStartTemplate?: (dragState: { type: VehicleType; orientation: Orientation; offsetX: number; offsetY: number }) => void;
   onDragEndTemplate?: () => void;
@@ -63,6 +64,7 @@ const PALETTE_TEMPLATES: PaletteItem[] = [
 export const SetupPalette: React.FC<SetupPaletteProps> = ({
   onDone,
   onClearBoard,
+  onRandom,
   onDragStartTemplate,
   onDragEndTemplate,
 }) => {
@@ -204,7 +206,7 @@ export const SetupPalette: React.FC<SetupPaletteProps> = ({
         </div>
       </div>
 
-      {/* Control Buttons: Clear Board & Play */}
+      {/* Control Buttons: Clear Board, Random & Play */}
       <div className="w-full flex flex-col gap-2 pt-2 border-t border-slate-800">
         <button
           onClick={onClearBoard}
@@ -212,6 +214,14 @@ export const SetupPalette: React.FC<SetupPaletteProps> = ({
         >
           <Trash2 className="w-3.5 h-3.5" />
           <span>Clear Board</span>
+        </button>
+
+        <button
+          onClick={onRandom}
+          className="w-full py-2.5 px-4 rounded-xl font-medium text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-amber-300 border border-slate-700/80 flex items-center justify-center gap-2 transition-all active:scale-[0.98] cursor-pointer"
+        >
+          <Shuffle className="w-3.5 h-3.5 text-amber-400" />
+          <span>Random</span>
         </button>
 
         <button

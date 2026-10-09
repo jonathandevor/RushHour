@@ -52,9 +52,9 @@ export default function App() {
   // Initial optimal moves computed when entering Play mode
   const [startingOptimalMoves, setStartingOptimalMoves] = useState<number>(0);
 
-  // Check if target Red Car exists on row 2
+  // Check if any car exists on row 2 horizontally
   const hasRedCar = useMemo(() => {
-    return vehicles.some((v) => v.isTarget && v.row === 2 && v.orientation === 'horizontal');
+    return vehicles.some((v) => v.type === 'car' && v.row === 2 && v.orientation === 'horizontal');
   }, [vehicles]);
 
   // Handle entering PLAY mode when Done is pressed
@@ -91,25 +91,19 @@ export default function App() {
     row: number;
     col: number;
   }) => {
-    // If placing a horizontal car on row 2 and there is no target red car on board yet:
-    const hasTarget = vehicles.some((v) => v.isTarget);
-    const isTargetPlacement = !hasTarget && newVeh.orientation === 'horizontal' && newVeh.row === 2 && newVeh.type === 'car';
-
-    const nextColor = isTargetPlacement
-      ? '#ef4444'
-      : VEHICLE_COLOR_PALETTE[colorCounter % VEHICLE_COLOR_PALETTE.length];
+    const isCarOnRow2 = newVeh.orientation === 'horizontal' && newVeh.row === 2 && newVeh.type === 'car';
+    const nextColor = VEHICLE_COLOR_PALETTE[colorCounter % VEHICLE_COLOR_PALETTE.length];
     setColorCounter((prev) => prev + 1);
 
-    const vehicleId = isTargetPlacement ? 'red' : `veh-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    const vehicleId = `veh-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
     const created: Vehicle = {
       id: vehicleId,
-      isTarget: isTargetPlacement,
+      isTarget: isCarOnRow2,
       type: newVeh.type,
       orientation: newVeh.orientation,
       row: newVeh.row,
       col: newVeh.col,
       color: nextColor,
-      name: isTargetPlacement ? 'Target Red Car' : undefined,
     };
 
     setVehicles((prev) => [...prev, created]);
@@ -119,7 +113,13 @@ export default function App() {
   // Relocate an existing vehicle to a new position on the board
   const handleRelocateVehicle = (vehicleId: string, newRow: number, newCol: number) => {
     setVehicles((prev) =>
-      prev.map((v) => (v.id === vehicleId ? { ...v, row: newRow, col: newCol } : v))
+      prev.map((v) => {
+        if (v.id === vehicleId) {
+          const isCarOnRow2 = v.type === 'car' && newRow === 2 && v.orientation === 'horizontal';
+          return { ...v, row: newRow, col: newCol, isTarget: isCarOnRow2 };
+        }
+        return v;
+      })
     );
     setActivePreset(null);
   };
@@ -136,6 +136,15 @@ export default function App() {
     soundManager.playClickSound();
     setVehicles([]);
     setActivePreset(null);
+  };
+
+  // Randomly populate board using one of the CLASSIC_PRESETS
+  const handleRandomPuzzle = () => {
+    soundManager.playClickSound();
+    const randomIndex = Math.floor(Math.random() * CLASSIC_PRESETS.length);
+    const preset = CLASSIC_PRESETS[randomIndex];
+    setActivePreset(preset);
+    setVehicles(JSON.parse(JSON.stringify(preset.vehicles)));
   };
 
   // Load preset
@@ -157,11 +166,11 @@ export default function App() {
         return false;
       }
 
-      // Check win move for Red Car exiting through row 2, col 5
+      // Check win move for any car exiting through row 2, col 5
+      const isExitingCar = targetVehicle.type === 'car' && targetVehicle.row === 2 && targetVehicle.orientation === 'horizontal';
       if (
-        targetVehicle.isTarget &&
+        isExitingCar &&
         direction === 'right' &&
-        targetVehicle.row === 2 &&
         targetVehicle.col === 4
       ) {
         soundManager.playSlideSound();
@@ -197,8 +206,8 @@ export default function App() {
         prev.map((v) => (v.id === vehicleId ? { ...v, row: newRow, col: newCol } : v))
       );
 
-      // Check if this move directly won (Red Car col >= 5)
-      if (targetVehicle.isTarget && newCol >= 5) {
+      // Check if this move directly won (Car col >= 5)
+      if (isExitingCar && newCol >= 5) {
         setIsWinningSequence(true);
         setTimeout(() => {
           setShowWinModal(true);
@@ -276,6 +285,7 @@ export default function App() {
                 <SetupPalette
                   onDone={handleDoneSetup}
                   onClearBoard={handleClearBoard}
+                  onRandom={handleRandomPuzzle}
                   hasRedCar={hasRedCar}
                   onDragStartTemplate={setActiveDragState}
                   onDragEndTemplate={() => setActiveDragState(null)}
@@ -407,7 +417,6 @@ export default function App() {
         optimalMoves={startingOptimalMoves}
         puzzleTitle={activePreset?.title}
         onPlayAgain={handleRestartPuzzle}
-        onNextPuzzle={handleNextPreset}
         onEditSetup={handleEnterSetup}
       />
 
