@@ -151,13 +151,79 @@ export default function App() {
     setActivePreset(null);
   };
 
-  // Randomly populate board using one of the CLASSIC_PRESETS
+  // Randomly generate a valid and solvable puzzle in board builder mode
   const handleRandomPuzzle = () => {
     soundManager.playClickSound();
-    const randomIndex = Math.floor(Math.random() * CLASSIC_PRESETS.length);
-    const preset = CLASSIC_PRESETS[randomIndex];
-    setActivePreset(preset);
-    setVehicles(JSON.parse(JSON.stringify(preset.vehicles)));
+
+    let currentVehicles: Vehicle[] = [];
+
+    // 1. First place a horizontal vehicle in the exit row (row 2) at least 2 spaces from exit (col + len <= 4)
+    const firstType: VehicleType = Math.random() < 0.6 ? 'car' : 'truck';
+    const firstLen = firstType === 'car' ? 2 : 3;
+    const maxCol = 4 - firstLen; // ensures col + len <= 4 (at least 2 spaces from exit at col 6)
+    const firstCol = Math.floor(Math.random() * (maxCol + 1));
+
+    const firstVehicle: Vehicle = {
+      id: `veh-${Date.now()}-target`,
+      isTarget: true,
+      type: firstType,
+      orientation: 'horizontal',
+      row: 2,
+      col: firstCol,
+      color: '#ef4444',
+    };
+
+    currentVehicles.push(firstVehicle);
+
+    let lastSolvableVehicles: Vehicle[] = JSON.parse(JSON.stringify(currentVehicles));
+
+    // 2. Add random vehicles one by one, checking validity and solvability
+    let attempts = 0;
+    const maxAttempts = 30;
+
+    while (attempts < maxAttempts) {
+      attempts++;
+      const randType: VehicleType = Math.random() < 0.6 ? 'car' : 'truck';
+      const randOrientation: Orientation = Math.random() < 0.5 ? 'horizontal' : 'vertical';
+      const randRow = Math.floor(Math.random() * 6);
+      const randCol = Math.floor(Math.random() * 6);
+      const randColor = VEHICLE_COLOR_PALETTE[Math.floor(Math.random() * VEHICLE_COLOR_PALETTE.length)];
+
+      const candidate = {
+        type: randType,
+        orientation: randOrientation,
+        row: randRow,
+        col: randCol,
+      };
+
+      // Check if placement is valid (entirely on board, no overlap)
+      if (isValidPlacement(candidate, currentVehicles)) {
+        const candidateVehicle: Vehicle = {
+          id: `veh-${Date.now()}-${Math.floor(Math.random() * 10000)}`,
+          isTarget: false,
+          type: randType,
+          orientation: randOrientation,
+          row: randRow,
+          col: randCol,
+          color: randColor,
+        };
+
+        currentVehicles.push(candidateVehicle);
+
+        // Check if solvable
+        const solverRes = solveBoardBFS(currentVehicles);
+        if (solverRes.solvable) {
+          lastSolvableVehicles = JSON.parse(JSON.stringify(currentVehicles));
+        } else {
+          // Not solvable! Back off (remove candidate) and stop adding more vehicles
+          currentVehicles.pop();
+          break;
+        }
+      }
+    }
+
+    setVehicles(lastSolvableVehicles);
+    setActivePreset(null);
   };
 
   // Load preset
@@ -296,16 +362,57 @@ export default function App() {
           <div className="relative flex flex-col items-center">
             {/* SETUP MODE: Setup Palette (Positioned to the left of the board, vertically centered) */}
             {mode === 'SETUP' && (
-              <div className="absolute right-[calc(100%+24px)] top-1/2 -translate-y-1/2">
-                <SetupPalette
-                  onDone={handleDoneSetup}
-                  onClearBoard={handleClearBoard}
-                  onRandom={handleRandomPuzzle}
-                  hasRedCar={hasRedCar}
-                  onDragStartTemplate={setActiveDragState}
-                  onDragEndTemplate={() => setActiveDragState(null)}
-                />
-              </div>
+              <>
+                <div className="absolute right-[calc(100%+24px)] top-1/2 -translate-y-1/2">
+                  <SetupPalette
+                    onDone={handleDoneSetup}
+                    onClearBoard={handleClearBoard}
+                    onRandom={handleRandomPuzzle}
+                    hasRedCar={hasRedCar}
+                    onDragStartTemplate={setActiveDragState}
+                    onDragEndTemplate={() => setActiveDragState(null)}
+                  />
+                </div>
+
+                {/* SETUP MODE: Solver status rectangle to the right of the board */}
+                {vehicles.length > 0 && (
+                  <div className="absolute left-[calc(100%+24px)] top-0">
+                    <aside
+                      aria-label="Board Solver Status"
+                      className="w-64 bg-slate-900/90 border border-slate-800 rounded-3xl p-5 flex flex-col gap-4 shadow-2xl backdrop-blur-sm shrink-0 select-none"
+                    >
+                      <span className="text-xs font-semibold uppercase tracking-wider text-slate-400 text-center">
+                        Board Status
+                      </span>
+                      <div className="text-center">
+                        {solverResult.solvable ? (
+                          <div className="flex flex-col items-center gap-1.5 text-emerald-400">
+                            <CheckCircle2 className="w-5 h-5 shrink-0" />
+                            <span className="text-sm font-semibold">
+                              {solverResult.minMoves === 0 ? (
+                                'Already Solved'
+                              ) : (
+                                <>
+                                  Solvable in{' '}
+                                  <strong className="font-mono font-bold text-white text-base tabular-nums">
+                                    {solverResult.minMoves}
+                                  </strong>{' '}
+                                  {solverResult.minMoves === 1 ? 'step' : 'steps'}
+                                </>
+                              )}
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="flex flex-col items-center gap-1.5 text-rose-400">
+                            <AlertTriangle className="w-5 h-5 shrink-0" />
+                            <span className="text-sm font-semibold">Unsolvable board</span>
+                          </div>
+                        )}
+                      </div>
+                    </aside>
+                  </div>
+                )}
+              </>
             )}
 
             {/* PLAY MODE: Vertical rectangle with the remaining labels to the left of the board */}
