@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { X, ArrowRight, ShieldCheck, Cpu } from 'lucide-react';
+import { ArrowRight, ShieldCheck, Cpu } from 'lucide-react';
 
 interface RulesModalProps {
   isOpen: boolean;
@@ -26,12 +26,6 @@ export const RulesModal: React.FC<RulesModalProps> = ({ isOpen, onClose }) => {
           <h2 id="rules-modal-title" className="text-lg font-bold text-white tracking-tight flex items-center gap-2">
             <span>Game Rules & Controls</span>
           </h2>
-          <button
-            onClick={onClose}
-            className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-colors"
-          >
-            <X className="w-4 h-4" />
-          </button>
         </div>
 
         <div className="flex flex-col gap-4 text-xs leading-relaxed">

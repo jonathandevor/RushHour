@@ -52,9 +52,9 @@ export default function App() {
   // Initial optimal moves computed when entering Play mode
   const [startingOptimalMoves, setStartingOptimalMoves] = useState<number>(0);
 
-  // Check if any car exists on row 2 horizontally
+  // Check if any vehicle exists on row 2 horizontally
   const hasRedCar = useMemo(() => {
-    return vehicles.some((v) => v.type === 'car' && v.row === 2 && v.orientation === 'horizontal');
+    return vehicles.some((v) => v.row === 2 && v.orientation === 'horizontal');
   }, [vehicles]);
 
   // Handle entering PLAY mode when Done is pressed
@@ -91,14 +91,14 @@ export default function App() {
     row: number;
     col: number;
   }) => {
-    const isCarOnRow2 = newVeh.orientation === 'horizontal' && newVeh.row === 2 && newVeh.type === 'car';
+    const isOnRow2 = newVeh.orientation === 'horizontal' && newVeh.row === 2;
     const nextColor = VEHICLE_COLOR_PALETTE[colorCounter % VEHICLE_COLOR_PALETTE.length];
     setColorCounter((prev) => prev + 1);
 
     const vehicleId = `veh-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
     const created: Vehicle = {
       id: vehicleId,
-      isTarget: isCarOnRow2,
+      isTarget: isOnRow2,
       type: newVeh.type,
       orientation: newVeh.orientation,
       row: newVeh.row,
@@ -115,8 +115,8 @@ export default function App() {
     setVehicles((prev) =>
       prev.map((v) => {
         if (v.id === vehicleId) {
-          const isCarOnRow2 = v.type === 'car' && newRow === 2 && v.orientation === 'horizontal';
-          return { ...v, row: newRow, col: newCol, isTarget: isCarOnRow2 };
+          const isOnRow2 = v.orientation === 'horizontal' && newRow === 2;
+          return { ...v, row: newRow, col: newCol, isTarget: isOnRow2 };
         }
         return v;
       })
@@ -166,12 +166,14 @@ export default function App() {
         return false;
       }
 
-      // Check win move for any car exiting through row 2, col 5
-      const isExitingCar = targetVehicle.type === 'car' && targetVehicle.row === 2 && targetVehicle.orientation === 'horizontal';
+      // Check win move for any vehicle (car or truck) exiting through row 2
+      const exitingLen = targetVehicle.type === 'car' ? 2 : 3;
+      const winningCol = 6 - exitingLen;
+      const isExitingVehicle = targetVehicle.row === 2 && targetVehicle.orientation === 'horizontal';
       if (
-        isExitingCar &&
+        isExitingVehicle &&
         direction === 'right' &&
-        targetVehicle.col === 4
+        targetVehicle.col === winningCol
       ) {
         soundManager.playSlideSound();
         setMoveHistory((prev) => [...prev, vehicles]);
@@ -206,8 +208,8 @@ export default function App() {
         prev.map((v) => (v.id === vehicleId ? { ...v, row: newRow, col: newCol } : v))
       );
 
-      // Check if this move directly won (Car col >= 5)
-      if (isExitingCar && newCol >= 5) {
+      // Check if this move directly won (Vehicle exiting)
+      if (isExitingVehicle && newCol >= winningCol + 1) {
         setIsWinningSequence(true);
         setTimeout(() => {
           setShowWinModal(true);
