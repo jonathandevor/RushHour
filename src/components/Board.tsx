@@ -22,6 +22,7 @@ interface BoardProps {
   activeDragState?: { length: 2 | 3; orientation: Orientation; offsetX: number; offsetY: number; vehicleId?: string } | null;
   onDragStartExisting?: (dragState: { length: 2 | 3; orientation: Orientation; vehicleId: string; offsetX: number; offsetY: number }) => void;
   onDragEndExisting?: () => void;
+  cellSize?: number;
 }
 
 export const Board: React.FC<BoardProps> = ({
@@ -36,6 +37,7 @@ export const Board: React.FC<BoardProps> = ({
   activeDragState,
   onDragStartExisting,
   onDragEndExisting,
+  cellSize,
 }) => {
   const boardRef = useRef<HTMLDivElement>(null);
   const [dragOverCells, setDragOverCells] = useState<{
@@ -43,10 +45,13 @@ export const Board: React.FC<BoardProps> = ({
     isValid: boolean;
   } | null>(null);
 
-  // 6x6 Grid Dimensions: 72px cell size, seamless grid with straight brown line overlay
-  const CELL_SIZE = 72; // pixels
-  const BOARD_PIXEL_SIZE = 6 * CELL_SIZE; // 432px
+  // 6x6 Grid Dimensions: dynamic cell size, seamless grid with straight brown line overlay
+  const CELL_SIZE = cellSize && cellSize > 0 ? cellSize : 72; // pixels
+  const BOARD_PIXEL_SIZE = 6 * CELL_SIZE;
   const BROWN_LINE_COLOR = '#8B5A2B'; // Straight brown grid line color
+  const framePadding = CELL_SIZE < 55 ? 10 : CELL_SIZE < 65 ? 12 : 16;
+  const exitOffsetRight = CELL_SIZE < 50 ? '-36px' : CELL_SIZE < 60 ? '-44px' : '-52px';
+  const marginForExit = CELL_SIZE < 50 ? '36px' : CELL_SIZE < 60 ? '44px' : '52px';
 
   // Drag over handler for Setup mode: calculates exact anchor so marked squares alight perfectly under the dragged vehicle
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
@@ -135,9 +140,15 @@ export const Board: React.FC<BoardProps> = ({
   };
 
   return (
-    <div className="relative flex items-center justify-center p-2 sm:p-4 select-none">
+    <div
+      className="relative flex items-center justify-center p-1 sm:p-3 select-none max-w-full"
+      style={{ marginRight: marginForExit }}
+    >
       {/* Outer Board Frame */}
-      <div className="relative bg-slate-950 p-4 rounded-3xl border-2 border-slate-800 shadow-2xl shadow-black/80 flex items-center">
+      <div
+        className="relative bg-slate-950 rounded-2xl sm:rounded-3xl border-2 border-slate-800 shadow-2xl shadow-black/80 flex items-center shrink-0"
+        style={{ padding: `${framePadding}px` }}
+      >
         {/* Main 6x6 Board Container */}
         <div
           ref={boardRef}
@@ -283,24 +294,31 @@ export const Board: React.FC<BoardProps> = ({
 
         {/* ---------------- EXIT GATE ON RIGHT SIDE OF 3RD ROW (INDEX 2) ---------------- */}
         <div
-          className="absolute -right-10 sm:-right-14 z-30 flex items-center"
+          className="absolute z-30 flex items-center"
           style={{
-            top: `${16 + 2 * CELL_SIZE}px`,
+            top: `${framePadding + 2 * CELL_SIZE}px`,
             height: `${CELL_SIZE}px`,
+            right: exitOffsetRight,
           }}
         >
           {/* Exit Channel Graphic & Arrow */}
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-0.5 sm:gap-1">
             {/* Visual gate cut with brown accent boundary */}
-            <div className="w-3 h-14 bg-gradient-to-r from-transparent to-amber-500/20 border-r border-[#8B5A2B] flex items-center justify-center">
-              <ChevronRight className="w-4 h-4 text-amber-400 animate-pulse -mr-1" />
+            <div
+              className="bg-gradient-to-r from-transparent to-amber-500/20 border-r border-[#8B5A2B] flex items-center justify-center"
+              style={{
+                width: CELL_SIZE < 55 ? '8px' : '12px',
+                height: `${Math.round(CELL_SIZE * 0.72)}px`,
+              }}
+            >
+              <ChevronRight className={`${CELL_SIZE < 55 ? 'w-3 h-3' : 'w-4 h-4'} text-amber-400 animate-pulse -mr-1`} />
             </div>
 
             {/* EXIT Sign Badge */}
-            <div className="bg-gradient-to-r from-red-600 via-rose-600 to-amber-600 text-white px-2 sm:px-2.5 py-1.5 rounded-lg shadow-lg shadow-red-950/60 border border-white/20 flex flex-col items-center justify-center">
-              <div className="flex items-center gap-1">
-                <LogOut className="w-3.5 h-3.5 text-white" />
-                <span className="text-[11px] sm:text-xs font-black tracking-widest uppercase">
+            <div className="bg-gradient-to-r from-red-600 via-rose-600 to-amber-600 text-white px-1.5 sm:px-2.5 py-1 sm:py-1.5 rounded-md sm:rounded-lg shadow-lg shadow-red-950/60 border border-white/20 flex flex-col items-center justify-center">
+              <div className="flex items-center gap-0.5 sm:gap-1">
+                <LogOut className={`${CELL_SIZE < 55 ? 'w-3 h-3' : 'w-3.5 h-3.5'} text-white`} />
+                <span className={`${CELL_SIZE < 55 ? 'text-[9px]' : 'text-[11px] sm:text-xs'} font-black tracking-wider sm:tracking-widest uppercase`}>
                   EXIT
                 </span>
               </div>

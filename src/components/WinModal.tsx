@@ -51,19 +51,19 @@ export const WinModal: React.FC<WinModalProps> = ({
       role="dialog"
       aria-modal="true"
       aria-labelledby="win-modal-title"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-300"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-300"
     >
-      <div className="w-full max-w-md bg-slate-900 border border-slate-700/80 rounded-3xl p-6 sm:p-8 shadow-2xl shadow-black/80 flex flex-col items-center text-center relative overflow-hidden">
+      <div className="w-full max-w-md max-h-[90vh] overflow-y-auto bg-slate-900 border border-slate-700/80 rounded-2xl sm:rounded-3xl p-5 sm:p-8 shadow-2xl shadow-black/80 flex flex-col items-center text-center relative">
         {/* Decorative Top Accent Glow */}
         <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-red-500 via-amber-400 to-emerald-500" />
 
         {/* Trophy Icon */}
-        <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 mb-4 shadow-lg shadow-amber-500/10">
-          <Trophy className="w-8 h-8" />
+        <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 mb-3 sm:mb-4 shadow-lg shadow-amber-500/10 shrink-0">
+          <Trophy className="w-6 h-6 sm:w-8 sm:h-8" />
         </div>
 
         {/* Congratulations Title */}
-        <h2 id="win-modal-title" className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+        <h2 id="win-modal-title" className="text-xl sm:text-2xl md:text-3xl font-extrabold text-white tracking-tight">
           Puzzle Solved!
         </h2>
         {puzzleTitle && (

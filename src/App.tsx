@@ -56,6 +56,28 @@ export default function App() {
   const prevMinMovesRef = useRef<number | null>(null);
   const feedbackTimerRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Measure window width for dynamic scaling across desktop and mobile screens
+  const [windowWidth, setWindowWidth] = useState<number>(() => {
+    return typeof window !== 'undefined' ? window.innerWidth : 1200;
+  });
+
+  useEffect(() => {
+    const handleResize = () => {
+      setWindowWidth(window.innerWidth);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const isWideScreen = windowWidth >= 1150;
+
+  // Dynamically calculate optimal cellSize so board + frame + exit sign scale to fit the screen width
+  const dynamicCellSize = useMemo(() => {
+    const horizontalMargin = windowWidth < 640 ? 72 : 96;
+    const availableWidth = windowWidth - horizontalMargin;
+    return Math.max(36, Math.min(72, Math.floor(availableWidth / 6)));
+  }, [windowWidth]);
+
   const handleSaveBoard = () => {
     soundManager.playClickSound();
     try {
@@ -620,14 +642,13 @@ export default function App() {
       />
 
       {/* Main Game Stage */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 flex flex-col items-center justify-start pt-4 sm:pt-6">
-        {/* Board and Left Panels Workspace - Perfectly identical coordinates in both modes */}
-        <div className="w-full flex items-center justify-center relative">
-          <div className="relative flex flex-col items-center">
-            {/* SETUP MODE: Setup Palette (Positioned to the left of the board, vertically centered) */}
-            {mode === 'SETUP' && (
+      <main className="flex-1 max-w-7xl w-full mx-auto px-2 sm:px-6 lg:px-8 py-3 sm:py-6 flex flex-col items-center justify-start">
+        {isWideScreen ? (
+          /* Desktop Balanced 3-Column Layout */
+          <div className="w-full flex justify-center items-start gap-6">
+            {mode === 'SETUP' ? (
               <>
-                <div className="absolute right-[calc(100%+24px)] top-1/2 -translate-y-1/2">
+                <div className="w-64 shrink-0 flex justify-end">
                   <SetupPalette
                     onDone={handleDoneSetup}
                     onClearBoard={handleClearBoard}
@@ -635,15 +656,30 @@ export default function App() {
                     hasRedCar={hasRedCar}
                     onDragStartTemplate={setActiveDragState}
                     onDragEndTemplate={() => setActiveDragState(null)}
+                    cellSize={dynamicCellSize}
                   />
                 </div>
-
-                {/* SETUP MODE: Solver status & Save/Load controls to the right of the board */}
-                <div className="absolute left-[calc(100%+24px)] top-0 flex flex-col gap-4 w-64">
+                <div className="shrink-0 flex items-center justify-center">
+                  <Board
+                    vehicles={vehicles}
+                    mode={mode}
+                    nextMove={showHints ? solverResult.nextMove : null}
+                    onMoveOneStep={handleMoveOneStep}
+                    onPlaceVehicle={handlePlaceVehicle}
+                    onRelocateVehicle={handleRelocateVehicle}
+                    onRemoveVehicle={handleRemoveVehicle}
+                    isWinningSequence={isWinningSequence}
+                    activeDragState={activeDragState}
+                    onDragStartExisting={setActiveDragState}
+                    onDragEndExisting={() => setActiveDragState(null)}
+                    cellSize={dynamicCellSize}
+                  />
+                </div>
+                <div className="w-64 shrink-0 flex flex-col gap-4">
                   {vehicles.length > 0 && (
                     <aside
                       aria-label="Board Solver Status"
-                      className="w-full bg-slate-900/90 border border-slate-800 rounded-3xl p-5 flex flex-col gap-4 shadow-2xl backdrop-blur-sm shrink-0 select-none"
+                      className="w-full bg-slate-900/90 border border-slate-800 rounded-2xl sm:rounded-3xl p-5 flex flex-col gap-4 shadow-2xl backdrop-blur-sm select-none"
                     >
                       <span className="text-xs font-semibold uppercase tracking-wider text-slate-400 text-center">
                         Board Status
@@ -678,9 +714,8 @@ export default function App() {
 
                   <aside
                     aria-label="Board Storage Controls"
-                    className="w-full bg-slate-900/90 border border-slate-800 rounded-3xl p-5 flex flex-col gap-3 shadow-2xl backdrop-blur-sm shrink-0 select-none"
+                    className="w-full bg-slate-900/90 border border-slate-800 rounded-2xl sm:rounded-3xl p-5 flex flex-col gap-3 shadow-2xl backdrop-blur-sm select-none"
                   >
-
                     <div className="flex flex-col gap-2">
                       <button
                         onClick={handleSaveBoard}
@@ -705,7 +740,7 @@ export default function App() {
                           <AlertTriangle className="w-4 h-4 shrink-0" />
                           <span>Load Error</span>
                         </div>
-                        <p className="text-rose-300/90 leading-relaxed">{loadError}</p>
+                        <p className="text-rose-300/90 leading-relaxed text-xs">{loadError}</p>
                       </div>
                     )}
 
@@ -719,50 +754,204 @@ export default function App() {
                   </aside>
                 </div>
               </>
-            )}
+            ) : (
+              <>
+                <div className="w-64 shrink-0">
+                  <aside
+                    aria-label="Game Controls"
+                    className="w-full bg-slate-900/90 border border-slate-800 rounded-3xl p-5 flex flex-col gap-4 shadow-2xl backdrop-blur-sm select-none"
+                  >
+                    {/* Moves & Telemetry */}
+                    <div className="flex flex-col gap-3">
+                      {/* Moves Counter Card */}
+                      <div className="bg-slate-800/80 border border-slate-700/60 rounded-2xl p-4 flex flex-col items-center">
+                        <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                          Moves
+                        </span>
+                        <div className="flex items-center justify-center relative mt-1 w-full">
+                          <span className="font-mono text-3xl font-extrabold text-white tabular-nums">
+                            {moveCount}
+                          </span>
+                          {moveFeedback === 'up' && (
+                            <span
+                              aria-label="Moves to solve decreased"
+                              className="absolute left-[calc(50%+1.8rem)] flex items-center text-emerald-400 animate-in fade-in zoom-in duration-200"
+                            >
+                              <ThumbsUp className="w-5 h-5 fill-emerald-500/20 shrink-0" />
+                            </span>
+                          )}
+                          {moveFeedback === 'down' && (
+                            <span
+                              aria-label="Moves to solve increased"
+                              className="absolute left-[calc(50%+1.8rem)] flex items-center text-rose-400 animate-in fade-in zoom-in duration-200"
+                            >
+                              <ThumbsDown className="w-5 h-5 fill-rose-500/20 shrink-0" />
+                            </span>
+                          )}
+                        </div>
+                      </div>
 
-            {/* PLAY MODE: Vertical rectangle with the remaining labels to the left of the board */}
-            {mode === 'PLAY' && (
-              <div className="absolute right-[calc(100%+24px)] top-0">
+                      {/* Solver Status Card */}
+                      <div className="bg-slate-800/50 border border-slate-700/50 rounded-2xl p-3 flex items-center justify-center text-center">
+                        {solverResult.solvable ? (
+                          <div className="flex items-center gap-2 text-xs font-medium text-emerald-400">
+                            <CheckCircle2 className="w-4 h-4 shrink-0" />
+                            <span>
+                              {solverResult.minMoves === 0 ? (
+                                'Escaped!'
+                              ) : (
+                                <>
+                                  <strong className="font-mono font-bold tabular-nums">
+                                    {solverResult.minMoves}
+                                  </strong>{' '}
+                                  moves to solve
+                                </>
+                              )}
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2 text-xs font-medium text-rose-400">
+                            <AlertTriangle className="w-4 h-4 shrink-0" />
+                            <span>Unsolvable board</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Preset Info if active */}
+                      {activePreset && (
+                        <div className="px-1 text-center text-xs text-slate-400">
+                          Preset:{' '}
+                          <span className="text-slate-200 font-medium">
+                            {activePreset.title}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Action Controls */}
+                    <div className="flex flex-col gap-2 pt-2 border-t border-slate-800">
+                      <button
+                        onClick={() => setShowHints(!showHints)}
+                        className={`w-full py-2.5 px-3 rounded-xl border text-xs font-medium flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                          showHints
+                            ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-sm'
+                            : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-white hover:bg-slate-700'
+                        }`}
+                      >
+                        <Lightbulb className="w-4 h-4 shrink-0" />
+                        <span>Hints {showHints ? 'On' : 'Off'}</span>
+                      </button>
+
+                      <button
+                        onClick={handleUndoMove}
+                        disabled={moveHistory.length === 0}
+                        className="w-full py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:pointer-events-none text-slate-200 hover:text-white border border-slate-700 text-xs font-medium flex items-center justify-center gap-2 transition-all cursor-pointer"
+                      >
+                        <Undo2 className="w-4 h-4 shrink-0" />
+                        <span>Undo</span>
+                      </button>
+
+                      <button
+                        onClick={handleRestartPuzzle}
+                        className="w-full py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700 text-xs font-medium flex items-center justify-center gap-2 transition-all cursor-pointer"
+                      >
+                        <RotateCcw className="w-4 h-4 shrink-0" />
+                        <span>Restart</span>
+                      </button>
+
+                      <button
+                        onClick={handleEnterSetup}
+                        className="w-full py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700 text-xs font-medium flex items-center justify-center gap-2 transition-all cursor-pointer"
+                      >
+                        <Settings2 className="w-4 h-4 shrink-0 text-slate-400" />
+                        <span>Board Builder</span>
+                      </button>
+                    </div>
+                  </aside>
+                </div>
+                <div className="shrink-0 flex items-center justify-center">
+                  <Board
+                    vehicles={vehicles}
+                    mode={mode}
+                    nextMove={showHints ? solverResult.nextMove : null}
+                    onMoveOneStep={handleMoveOneStep}
+                    onPlaceVehicle={handlePlaceVehicle}
+                    onRelocateVehicle={handleRelocateVehicle}
+                    onRemoveVehicle={handleRemoveVehicle}
+                    isWinningSequence={isWinningSequence}
+                    activeDragState={activeDragState}
+                    onDragStartExisting={setActiveDragState}
+                    onDragEndExisting={() => setActiveDragState(null)}
+                    cellSize={dynamicCellSize}
+                  />
+                </div>
+                {/* Invisible Spacer for dead-center balance in PLAY mode */}
+                <div className="w-64 shrink-0 invisible pointer-events-none" aria-hidden="true" />
+              </>
+            )}
+          </div>
+        ) : (
+          /* Narrow / Mobile Screen Scaled Layout - Fits 100% within screen width */
+          <div className="w-full flex flex-col items-center gap-4 sm:gap-6">
+            {/* The 6x6 Game Board */}
+            <div className="w-full flex items-center justify-center overflow-visible">
+              <Board
+                vehicles={vehicles}
+                mode={mode}
+                nextMove={showHints ? solverResult.nextMove : null}
+                onMoveOneStep={handleMoveOneStep}
+                onPlaceVehicle={handlePlaceVehicle}
+                onRelocateVehicle={handleRelocateVehicle}
+                onRemoveVehicle={handleRemoveVehicle}
+                isWinningSequence={isWinningSequence}
+                activeDragState={activeDragState}
+                onDragStartExisting={setActiveDragState}
+                onDragEndExisting={() => setActiveDragState(null)}
+                cellSize={dynamicCellSize}
+              />
+            </div>
+
+            {mode === 'PLAY' ? (
+              <div className="w-full max-w-xs sm:max-w-sm">
                 <aside
                   aria-label="Game Controls"
-                  className="w-64 bg-slate-900/90 border border-slate-800 rounded-3xl p-5 flex flex-col gap-4 shadow-2xl backdrop-blur-sm shrink-0 select-none"
+                  className="w-full bg-slate-900/90 border border-slate-800 rounded-2xl sm:rounded-3xl p-4 sm:p-5 flex flex-col gap-3 sm:gap-4 shadow-2xl backdrop-blur-sm select-none"
                 >
                   {/* Moves & Telemetry */}
-                  <div className="flex flex-col gap-3">
+                  <div className="flex flex-col gap-2.5 sm:gap-3">
                     {/* Moves Counter Card */}
-                    <div className="bg-slate-800/80 border border-slate-700/60 rounded-2xl p-4 flex flex-col items-center">
-                      <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                    <div className="bg-slate-800/80 border border-slate-700/60 rounded-xl sm:rounded-2xl p-3 sm:p-4 flex flex-col items-center">
+                      <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-slate-400">
                         Moves
                       </span>
-                      <div className="flex items-center justify-center relative mt-1 w-full">
-                        <span className="font-mono text-3xl font-extrabold text-white tabular-nums">
+                      <div className="flex items-center justify-center relative mt-0.5 sm:mt-1 w-full">
+                        <span className="font-mono text-2xl sm:text-3xl font-extrabold text-white tabular-nums">
                           {moveCount}
                         </span>
                         {moveFeedback === 'up' && (
                           <span
                             aria-label="Moves to solve decreased"
-                            className="absolute left-[calc(50%+1.8rem)] flex items-center text-emerald-400 animate-in fade-in zoom-in duration-200"
+                            className="absolute left-[calc(50%+1.5rem)] sm:left-[calc(50%+1.8rem)] flex items-center text-emerald-400 animate-in fade-in zoom-in duration-200"
                           >
-                            <ThumbsUp className="w-5 h-5 fill-emerald-500/20 shrink-0" />
+                            <ThumbsUp className="w-4 h-4 sm:w-5 sm:h-5 fill-emerald-500/20 shrink-0" />
                           </span>
                         )}
                         {moveFeedback === 'down' && (
                           <span
                             aria-label="Moves to solve increased"
-                            className="absolute left-[calc(50%+1.8rem)] flex items-center text-rose-400 animate-in fade-in zoom-in duration-200"
+                            className="absolute left-[calc(50%+1.5rem)] sm:left-[calc(50%+1.8rem)] flex items-center text-rose-400 animate-in fade-in zoom-in duration-200"
                           >
-                            <ThumbsDown className="w-5 h-5 fill-rose-500/20 shrink-0" />
+                            <ThumbsDown className="w-4 h-4 sm:w-5 sm:h-5 fill-rose-500/20 shrink-0" />
                           </span>
                         )}
                       </div>
                     </div>
 
                     {/* Solver Status Card */}
-                    <div className="bg-slate-800/50 border border-slate-700/50 rounded-2xl p-3 flex items-center justify-center text-center">
+                    <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl sm:rounded-2xl p-2.5 sm:p-3 flex items-center justify-center text-center">
                       {solverResult.solvable ? (
-                        <div className="flex items-center gap-2 text-xs font-medium text-emerald-400">
-                          <CheckCircle2 className="w-4 h-4 shrink-0" />
+                        <div className="flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-xs font-medium text-emerald-400">
+                          <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
                           <span>
                             {solverResult.minMoves === 0 ? (
                               'Escaped!'
@@ -777,8 +966,8 @@ export default function App() {
                           </span>
                         </div>
                       ) : (
-                        <div className="flex items-center gap-2 text-xs font-medium text-rose-400">
-                          <AlertTriangle className="w-4 h-4 shrink-0" />
+                        <div className="flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-xs font-medium text-rose-400">
+                          <AlertTriangle className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
                           <span>Unsolvable board</span>
                         </div>
                       )}
@@ -786,7 +975,7 @@ export default function App() {
 
                     {/* Preset Info if active */}
                     {activePreset && (
-                      <div className="px-1 text-center text-xs text-slate-400">
+                      <div className="px-1 text-center text-[11px] sm:text-xs text-slate-400">
                         Preset:{' '}
                         <span className="text-slate-200 font-medium">
                           {activePreset.title}
@@ -796,64 +985,142 @@ export default function App() {
                   </div>
 
                   {/* Action Controls */}
-                  <div className="flex flex-col gap-2 pt-2 border-t border-slate-800">
+                  <div className="flex flex-col gap-1.5 sm:gap-2 pt-2 border-t border-slate-800">
                     <button
                       onClick={() => setShowHints(!showHints)}
-                      className={`w-full py-2.5 px-3 rounded-xl border text-xs font-medium flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                      className={`w-full py-2 sm:py-2.5 px-3 rounded-lg sm:rounded-xl border text-xs font-medium flex items-center justify-center gap-2 transition-all cursor-pointer ${
                         showHints
                           ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-sm'
                           : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-white hover:bg-slate-700'
                       }`}
                     >
-                      <Lightbulb className="w-4 h-4 shrink-0" />
+                      <Lightbulb className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
                       <span>Hints {showHints ? 'On' : 'Off'}</span>
                     </button>
 
                     <button
                       onClick={handleUndoMove}
                       disabled={moveHistory.length === 0}
-                      className="w-full py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:pointer-events-none text-slate-200 hover:text-white border border-slate-700 text-xs font-medium flex items-center justify-center gap-2 transition-all cursor-pointer"
+                      className="w-full py-2 sm:py-2.5 px-3 rounded-lg sm:rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:pointer-events-none text-slate-200 hover:text-white border border-slate-700 text-xs font-medium flex items-center justify-center gap-2 transition-all cursor-pointer"
                     >
-                      <Undo2 className="w-4 h-4 shrink-0" />
+                      <Undo2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
                       <span>Undo</span>
                     </button>
 
                     <button
                       onClick={handleRestartPuzzle}
-                      className="w-full py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700 text-xs font-medium flex items-center justify-center gap-2 transition-all cursor-pointer"
+                      className="w-full py-2 sm:py-2.5 px-3 rounded-lg sm:rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700 text-xs font-medium flex items-center justify-center gap-2 transition-all cursor-pointer"
                     >
-                      <RotateCcw className="w-4 h-4 shrink-0" />
+                      <RotateCcw className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
                       <span>Restart</span>
                     </button>
 
                     <button
                       onClick={handleEnterSetup}
-                      className="w-full py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700 text-xs font-medium flex items-center justify-center gap-2 transition-all cursor-pointer"
+                      className="w-full py-2 sm:py-2.5 px-3 rounded-lg sm:rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700 text-xs font-medium flex items-center justify-center gap-2 transition-all cursor-pointer"
                     >
-                      <Settings2 className="w-4 h-4 shrink-0 text-slate-400" />
+                      <Settings2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0 text-slate-400" />
                       <span>Board Builder</span>
                     </button>
                   </div>
                 </aside>
               </div>
-            )}
+            ) : (
+              <>
+                <div className="w-full max-w-xs sm:max-w-sm flex justify-center">
+                  <SetupPalette
+                    onDone={handleDoneSetup}
+                    onClearBoard={handleClearBoard}
+                    onRandom={handleRandomPuzzle}
+                    hasRedCar={hasRedCar}
+                    onDragStartTemplate={setActiveDragState}
+                    onDragEndTemplate={() => setActiveDragState(null)}
+                    cellSize={dynamicCellSize}
+                  />
+                </div>
 
-            {/* The 6x6 Game Board with Straight Brown Line Overlay */}
-            <Board
-              vehicles={vehicles}
-              mode={mode}
-              nextMove={showHints ? solverResult.nextMove : null}
-              onMoveOneStep={handleMoveOneStep}
-              onPlaceVehicle={handlePlaceVehicle}
-              onRelocateVehicle={handleRelocateVehicle}
-              onRemoveVehicle={handleRemoveVehicle}
-              isWinningSequence={isWinningSequence}
-              activeDragState={activeDragState}
-              onDragStartExisting={setActiveDragState}
-              onDragEndExisting={() => setActiveDragState(null)}
-            />
+                <div className="w-full max-w-xs sm:max-w-sm flex flex-col gap-3 sm:gap-4">
+                  {vehicles.length > 0 && (
+                    <aside
+                      aria-label="Board Solver Status"
+                      className="w-full bg-slate-900/90 border border-slate-800 rounded-2xl sm:rounded-3xl p-4 sm:p-5 flex flex-col gap-3 sm:gap-4 shadow-2xl backdrop-blur-sm select-none"
+                    >
+                      <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-slate-400 text-center">
+                        Board Status
+                      </span>
+                      <div className="text-center">
+                        {solverResult.solvable ? (
+                          <div className="flex flex-col items-center gap-1 sm:gap-1.5 text-emerald-400">
+                            <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
+                            <span className="text-xs sm:text-sm font-semibold">
+                              {solverResult.minMoves === 0 ? (
+                                'Already Solved'
+                              ) : (
+                                <>
+                                  Solvable in{' '}
+                                  <strong className="font-mono font-bold text-white text-sm sm:text-base tabular-nums">
+                                    {solverResult.minMoves}
+                                  </strong>{' '}
+                                  {solverResult.minMoves === 1 ? 'step' : 'steps'}
+                                </>
+                              )}
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="flex flex-col items-center gap-1 sm:gap-1.5 text-rose-400">
+                            <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
+                            <span className="text-xs sm:text-sm font-semibold">Unsolvable board</span>
+                          </div>
+                        )}
+                      </div>
+                    </aside>
+                  )}
+
+                  <aside
+                    aria-label="Board Storage Controls"
+                    className="w-full bg-slate-900/90 border border-slate-800 rounded-2xl sm:rounded-3xl p-4 sm:p-5 flex flex-col gap-2.5 sm:gap-3 shadow-2xl backdrop-blur-sm select-none"
+                  >
+                    <div className="flex flex-col gap-2">
+                      <button
+                        onClick={handleSaveBoard}
+                        className="w-full py-2 sm:py-2.5 px-3 sm:px-4 rounded-lg sm:rounded-xl font-medium text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700/80 flex items-center justify-center gap-2 transition-all active:scale-[0.98] cursor-pointer"
+                      >
+                        <Save className="w-3.5 h-3.5 text-blue-400" />
+                        <span>Save Board State</span>
+                      </button>
+
+                      <button
+                        onClick={handleLoadClick}
+                        className="w-full py-2 sm:py-2.5 px-3 sm:px-4 rounded-lg sm:rounded-xl font-medium text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700/80 flex items-center justify-center gap-2 transition-all active:scale-[0.98] cursor-pointer"
+                      >
+                        <FolderOpen className="w-3.5 h-3.5 text-amber-400" />
+                        <span>Load Board State</span>
+                      </button>
+                    </div>
+
+                    {loadError && (
+                      <div className="bg-rose-500/10 border border-rose-500/30 rounded-xl p-2.5 sm:p-3 flex flex-col gap-1 sm:gap-1.5 text-rose-300 text-xs">
+                        <div className="flex items-center gap-1.5 font-semibold">
+                          <AlertTriangle className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+                          <span>Load Error</span>
+                        </div>
+                        <p className="text-rose-300/90 leading-relaxed text-[11px] sm:text-xs">{loadError}</p>
+                      </div>
+                    )}
+
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      onChange={handleFileSelected}
+                      accept=".txt,text/plain"
+                      className="hidden"
+                    />
+                  </aside>
+                </div>
+              </>
+            )}
           </div>
-        </div>
+        )}
       </main>
 
       {/* Win Celebration Overlay */}

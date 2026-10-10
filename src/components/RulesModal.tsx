@@ -19,9 +19,9 @@ export const RulesModal: React.FC<RulesModalProps> = ({ isOpen, onClose }) => {
       role="dialog"
       aria-modal="true"
       aria-labelledby="rules-modal-title"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200"
     >
-      <div className="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-7 shadow-2xl shadow-black/80 flex flex-col gap-5 text-slate-300 relative">
+      <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto bg-slate-900 border border-slate-800 rounded-2xl sm:rounded-3xl p-4 sm:p-7 shadow-2xl shadow-black/80 flex flex-col gap-4 sm:gap-5 text-slate-300 relative">
         <div className="flex items-center justify-between border-b border-slate-800 pb-4">
           <h2 id="rules-modal-title" className="text-lg font-bold text-white tracking-tight flex items-center gap-2">
             <span>Game Rules & Controls</span>

@@ -236,10 +236,10 @@ export const VehiclePiece: React.FC<VehiclePieceProps> = ({
               e.preventDefault();
               onRemove(vehicle.id);
             }}
-            className="absolute top-1 right-1 w-6 h-6 rounded-full bg-rose-600/90 hover:bg-rose-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-md z-30 cursor-pointer"
+            className="absolute top-0.5 right-0.5 sm:top-1 sm:right-1 w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-rose-600/90 hover:bg-rose-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-md z-30 cursor-pointer"
             aria-label="Remove vehicle"
           >
-            <Trash2 className="w-3.5 h-3.5" />
+            <Trash2 className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
           </button>
         )}
 
@@ -253,8 +253,8 @@ export const VehiclePiece: React.FC<VehiclePieceProps> = ({
                     hoveredHalf === 'first' ? 'opacity-80' : 'opacity-0'
                   }`}
                 >
-                  <div className="w-5 h-5 rounded-full bg-black/40 text-white flex items-center justify-center backdrop-blur-xs">
-                    <ChevronLeft className="w-3.5 h-3.5" />
+                  <div className={`${cellSize < 55 ? 'w-4 h-4' : 'w-5 h-5'} rounded-full bg-black/40 text-white flex items-center justify-center backdrop-blur-xs`}>
+                    <ChevronLeft className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                   </div>
                 </div>
                 <div
@@ -262,8 +262,8 @@ export const VehiclePiece: React.FC<VehiclePieceProps> = ({
                     hoveredHalf === 'second' ? 'opacity-80' : 'opacity-0'
                   }`}
                 >
-                  <div className="w-5 h-5 rounded-full bg-black/40 text-white flex items-center justify-center backdrop-blur-xs">
-                    <ChevronRight className="w-3.5 h-3.5" />
+                  <div className={`${cellSize < 55 ? 'w-4 h-4' : 'w-5 h-5'} rounded-full bg-black/40 text-white flex items-center justify-center backdrop-blur-xs`}>
+                    <ChevronRight className="w-3.5 h-3.5 sm:w-3.5 sm:h-3.5" />
                   </div>
                 </div>
               </>
@@ -274,8 +274,8 @@ export const VehiclePiece: React.FC<VehiclePieceProps> = ({
                     hoveredHalf === 'first' ? 'opacity-80' : 'opacity-0'
                   }`}
                 >
-                  <div className="w-5 h-5 rounded-full bg-black/40 text-white flex items-center justify-center backdrop-blur-xs">
-                    <ChevronUp className="w-3.5 h-3.5" />
+                  <div className={`${cellSize < 55 ? 'w-4 h-4' : 'w-5 h-5'} rounded-full bg-black/40 text-white flex items-center justify-center backdrop-blur-xs`}>
+                    <ChevronUp className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                   </div>
                 </div>
                 <div
@@ -283,8 +283,8 @@ export const VehiclePiece: React.FC<VehiclePieceProps> = ({
                     hoveredHalf === 'second' ? 'opacity-80' : 'opacity-0'
                   }`}
                 >
-                  <div className="w-5 h-5 rounded-full bg-black/40 text-white flex items-center justify-center backdrop-blur-xs">
-                    <ChevronDown className="w-3.5 h-3.5" />
+                  <div className={`${cellSize < 55 ? 'w-4 h-4' : 'w-5 h-5'} rounded-full bg-black/40 text-white flex items-center justify-center backdrop-blur-xs`}>
+                    <ChevronDown className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                   </div>
                 </div>
               </div>
@@ -295,11 +295,17 @@ export const VehiclePiece: React.FC<VehiclePieceProps> = ({
         {/* BFS Shortest Path Hint Arrow in the Center */}
         {isHintVehicle && hintDirection && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
-            <div className="w-8 h-8 rounded-full bg-amber-400 text-slate-950 flex items-center justify-center shadow-lg shadow-amber-400/60 ring-2 ring-white animate-pulse">
-              {hintDirection === 'left' && <ChevronLeft className="w-5 h-5 stroke-[3] -translate-x-0.5" />}
-              {hintDirection === 'right' && <ChevronRight className="w-5 h-5 stroke-[3] translate-x-0.5" />}
-              {hintDirection === 'up' && <ChevronUp className="w-5 h-5 stroke-[3] -translate-y-0.5" />}
-              {hintDirection === 'down' && <ChevronDown className="w-5 h-5 stroke-[3] translate-y-0.5" />}
+            <div
+              className="rounded-full bg-amber-400 text-slate-950 flex items-center justify-center shadow-lg shadow-amber-400/60 ring-1 sm:ring-2 ring-white animate-pulse"
+              style={{
+                width: `${Math.max(20, Math.round(cellSize * 0.44))}px`,
+                height: `${Math.max(20, Math.round(cellSize * 0.44))}px`,
+              }}
+            >
+              {hintDirection === 'left' && <ChevronLeft className={`${cellSize < 55 ? 'w-3.5 h-3.5' : 'w-5 h-5'} stroke-[3] -translate-x-0.5`} />}
+              {hintDirection === 'right' && <ChevronRight className={`${cellSize < 55 ? 'w-3.5 h-3.5' : 'w-5 h-5'} stroke-[3] translate-x-0.5`} />}
+              {hintDirection === 'up' && <ChevronUp className={`${cellSize < 55 ? 'w-3.5 h-3.5' : 'w-5 h-5'} stroke-[3] -translate-y-0.5`} />}
+              {hintDirection === 'down' && <ChevronDown className={`${cellSize < 55 ? 'w-3.5 h-3.5' : 'w-5 h-5'} stroke-[3] translate-y-0.5`} />}
             </div>
           </div>
         )}
