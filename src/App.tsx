@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { Vehicle, GameMode, MoveDirection, SolverResult, PuzzlePreset, Orientation, ActiveDragState } from './types/game';
 import { CLASSIC_PRESETS, VEHICLE_COLOR_PALETTE } from './data/presets';
 import { solveBoardBFS, canMoveOneStep, isValidPlacement } from './utils/solver';
@@ -22,6 +22,8 @@ import {
   AlertTriangle,
   Save,
   FolderOpen,
+  ThumbsUp,
+  ThumbsDown,
 } from 'lucide-react';
 
 export default function App() {
@@ -48,6 +50,11 @@ export default function App() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+
+  // Thumbs Up / Thumbs Down feedback when "moves to solve" changes in Play mode
+  const [moveFeedback, setMoveFeedback] = useState<'up' | 'down' | null>(null);
+  const prevMinMovesRef = useRef<number | null>(null);
+  const feedbackTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleSaveBoard = () => {
     soundManager.playClickSound();
@@ -105,10 +112,12 @@ export default function App() {
         return;
       }
 
+      const INVALID_FILE_MSG = 'Incorrect file format.';
+
       // 1. First verify that the file exists and is valid
       const fileSize = typeof file.size === 'number' ? file.size : (file as any).size ? Number((file as any).size) : 1;
       if (fileSize === 0) {
-        setLoadError('Incorrect file format');
+        setLoadError(INVALID_FILE_MSG);
         try { if (input) input.value = ''; } catch {}
         return;
       }
@@ -116,7 +125,7 @@ export default function App() {
       const reader = new FileReader();
 
       reader.onerror = () => {
-        setLoadError('Incorrect file format');
+        setLoadError(INVALID_FILE_MSG);
         try { if (input) input.value = ''; } catch {}
       };
 
@@ -124,7 +133,7 @@ export default function App() {
         try {
           const content = event?.target?.result;
           if (typeof content !== 'string' || !content.trim()) {
-            setLoadError('Incorrect file format');
+            setLoadError(INVALID_FILE_MSG);
             return;
           }
 
@@ -133,13 +142,13 @@ export default function App() {
           try {
             parsed = JSON.parse(content);
           } catch {
-            setLoadError('Incorrect file format');
+            setLoadError(INVALID_FILE_MSG);
             return;
           }
 
           // 3. Make sure that the JSON structure is as expected
           if (!parsed || typeof parsed !== 'object') {
-            setLoadError('Incorrect file format');
+            setLoadError(INVALID_FILE_MSG);
             return;
           }
 
@@ -151,7 +160,7 @@ export default function App() {
           }
 
           if (!loadedVehicles) {
-            setLoadError('Incorrect file format');
+            setLoadError(INVALID_FILE_MSG);
             return;
           }
 
@@ -162,7 +171,7 @@ export default function App() {
           for (let i = 0; i < loadedVehicles.length; i++) {
             const v = loadedVehicles[i];
             if (!v || typeof v !== 'object') {
-              setLoadError('Incorrect file format');
+              setLoadError(INVALID_FILE_MSG);
               return;
             }
 
@@ -175,13 +184,13 @@ export default function App() {
             } else if (v.type === 'truck') {
               resolvedLen = 3;
             } else {
-              setLoadError('Incorrect file format');
+              setLoadError(INVALID_FILE_MSG);
               return;
             }
 
             // Orientation must be 'horizontal' or 'vertical'
             if (v.orientation !== 'horizontal' && v.orientation !== 'vertical') {
-              setLoadError('Incorrect file format');
+              setLoadError(INVALID_FILE_MSG);
               return;
             }
 
@@ -196,17 +205,17 @@ export default function App() {
               v.col < 0 ||
               v.col > 5
             ) {
-              setLoadError('Incorrect file format');
+              setLoadError(INVALID_FILE_MSG);
               return;
             }
 
             // Must fit within 6x6 board
             if (v.orientation === 'horizontal' && v.col + resolvedLen > 6) {
-              setLoadError('Incorrect file format');
+              setLoadError(INVALID_FILE_MSG);
               return;
             }
             if (v.orientation === 'vertical' && v.row + resolvedLen > 6) {
-              setLoadError('Incorrect file format');
+              setLoadError(INVALID_FILE_MSG);
               return;
             }
 
@@ -216,7 +225,7 @@ export default function App() {
               const c = v.orientation === 'horizontal' ? v.col + s : v.col;
               const cellKey = `${r},${c}`;
               if (occupiedCells.has(cellKey)) {
-                setLoadError('Incorrect file format');
+                setLoadError(INVALID_FILE_MSG);
                 return;
               }
               occupiedCells.add(cellKey);
@@ -241,7 +250,7 @@ export default function App() {
             soundManager.playClickSound();
           } catch {}
         } catch {
-          setLoadError('Incorrect file format');
+          setLoadError(INVALID_FILE_MSG);
         } finally {
           try {
             if (input) input.value = '';
@@ -251,7 +260,7 @@ export default function App() {
 
       reader.readAsText(file);
     } catch {
-      setLoadError('Incorrect file format');
+      setLoadError('Incorrect file format.');
       try {
         if (input) input.value = '';
       } catch {}
@@ -262,6 +271,35 @@ export default function App() {
   const solverResult: SolverResult = useMemo(() => {
     return solveBoardBFS(vehicles);
   }, [vehicles]);
+
+  // Track changes to "moves to solve" in Play mode to trigger Thumbs Up / Thumbs Down feedback
+  useEffect(() => {
+    if (mode !== 'PLAY' || !solverResult.solvable) {
+      setMoveFeedback(null);
+      prevMinMovesRef.current = solverResult.solvable ? solverResult.minMoves : null;
+      return;
+    }
+
+    const currentMinMoves = solverResult.minMoves;
+    const prevMinMoves = prevMinMovesRef.current;
+
+    if (prevMinMoves !== null && currentMinMoves !== prevMinMoves) {
+      if (currentMinMoves < prevMinMoves) {
+        setMoveFeedback('up');
+      } else if (currentMinMoves > prevMinMoves) {
+        setMoveFeedback('down');
+      }
+
+      if (feedbackTimerRef.current) {
+        clearTimeout(feedbackTimerRef.current);
+      }
+      feedbackTimerRef.current = setTimeout(() => {
+        setMoveFeedback(null);
+      }, 2000);
+    }
+
+    prevMinMovesRef.current = currentMinMoves;
+  }, [mode, solverResult.minMoves, solverResult.solvable]);
 
   // Initial optimal moves computed when entering Play mode
   const [startingOptimalMoves, setStartingOptimalMoves] = useState<number>(0);
@@ -287,12 +325,16 @@ export default function App() {
 
     const sol = solveBoardBFS(activeVehicles);
     setStartingOptimalMoves(sol.minMoves);
+    prevMinMovesRef.current = sol.minMoves;
+    setMoveFeedback(null);
     setMode('PLAY');
   };
 
   // Return to SETUP mode
   const handleEnterSetup = () => {
     soundManager.playClickSound();
+    setMoveFeedback(null);
+    prevMinMovesRef.current = null;
     setMode('SETUP');
     setIsWinningSequence(false);
     setShowWinModal(false);
@@ -694,9 +736,27 @@ export default function App() {
                       <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
                         Moves
                       </span>
-                      <span className="font-mono text-3xl font-extrabold text-white tabular-nums mt-1">
-                        {moveCount}
-                      </span>
+                      <div className="flex items-center justify-center relative mt-1 w-full">
+                        <span className="font-mono text-3xl font-extrabold text-white tabular-nums">
+                          {moveCount}
+                        </span>
+                        {moveFeedback === 'up' && (
+                          <span
+                            aria-label="Moves to solve decreased"
+                            className="absolute left-[calc(50%+1.8rem)] flex items-center text-emerald-400 animate-in fade-in zoom-in duration-200"
+                          >
+                            <ThumbsUp className="w-5 h-5 fill-emerald-500/20 shrink-0" />
+                          </span>
+                        )}
+                        {moveFeedback === 'down' && (
+                          <span
+                            aria-label="Moves to solve increased"
+                            className="absolute left-[calc(50%+1.8rem)] flex items-center text-rose-400 animate-in fade-in zoom-in duration-200"
+                          >
+                            <ThumbsDown className="w-5 h-5 fill-rose-500/20 shrink-0" />
+                          </span>
+                        )}
+                      </div>
                     </div>
 
                     {/* Solver Status Card */}
