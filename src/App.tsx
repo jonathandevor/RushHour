@@ -81,13 +81,15 @@ export default function App() {
         }
         URL.revokeObjectURL(url);
       }, 100);
-    } catch (err) {
-      console.error('Save board failed:', err);
+    } catch {
+      // Handled safely without exposing internal exceptions
     }
   };
 
   const handleLoadClick = () => {
-    soundManager.playClickSound();
+    try {
+      soundManager.playClickSound();
+    } catch {}
     setLoadError(null);
     fileInputRef.current?.click();
   };
@@ -103,94 +105,156 @@ export default function App() {
         return;
       }
 
+      // 1. First verify that the file exists and is valid
       const fileSize = typeof file.size === 'number' ? file.size : (file as any).size ? Number((file as any).size) : 1;
       if (fileSize === 0) {
         setLoadError('Incorrect file format');
-        try { input.value = ''; } catch {}
+        try { if (input) input.value = ''; } catch {}
         return;
       }
 
       const reader = new FileReader();
 
       reader.onerror = () => {
-        setLoadError('Failed to read file.');
-        try { input.value = ''; } catch {}
+        setLoadError('Incorrect file format');
+        try { if (input) input.value = ''; } catch {}
       };
 
       reader.onload = (event) => {
         try {
           const content = event?.target?.result;
           if (typeof content !== 'string' || !content.trim()) {
-            throw new Error('Incorrect file format');
+            setLoadError('Incorrect file format');
+            return;
           }
 
-          // Wrapped JSON loader caught safely
+          // 2. Wrap the JSON loader so that any load/parse errors are caught cleanly
           let parsed: any;
           try {
             parsed = JSON.parse(content);
           } catch {
-            throw new Error('Incorrect file format');
+            setLoadError('Incorrect file format');
+            return;
           }
 
+          // 3. Make sure that the JSON structure is as expected
           if (!parsed || typeof parsed !== 'object') {
-            throw new Error('Incorrect file format');
+            setLoadError('Incorrect file format');
+            return;
           }
 
-          let loadedVehicles: any[] = [];
+          let loadedVehicles: any[] | null = null;
           if (Array.isArray(parsed)) {
             loadedVehicles = parsed;
           } else if (Array.isArray(parsed.vehicles)) {
             loadedVehicles = parsed.vehicles;
-          } else {
-            throw new Error('Incorrect file format');
           }
 
-          // Verify JSON structure and vehicle properties
-          for (const v of loadedVehicles) {
+          if (!loadedVehicles) {
+            setLoadError('Incorrect file format');
+            return;
+          }
+
+          // Verify every vehicle in the array meets requirements
+          const validatedVehicles: Vehicle[] = [];
+          const occupiedCells = new Set<string>();
+
+          for (let i = 0; i < loadedVehicles.length; i++) {
+            const v = loadedVehicles[i];
             if (!v || typeof v !== 'object') {
-              throw new Error('Incorrect file format');
+              setLoadError('Incorrect file format');
+              return;
             }
-            const resolvedLen = typeof v.length === 'number' ? v.length : ((v as any).type === 'truck' ? 3 : 2);
-            if (!v.id || (resolvedLen !== 2 && resolvedLen !== 3) || !v.orientation || (v.orientation !== 'horizontal' && v.orientation !== 'vertical') || typeof v.row !== 'number' || typeof v.col !== 'number') {
-              throw new Error('Incorrect file format');
+
+            // Length must be 2 or 3 (backward compatible with type: 'car' | 'truck')
+            let resolvedLen: 2 | 3;
+            if (v.length === 2 || v.length === 3) {
+              resolvedLen = v.length;
+            } else if (v.type === 'car') {
+              resolvedLen = 2;
+            } else if (v.type === 'truck') {
+              resolvedLen = 3;
+            } else {
+              setLoadError('Incorrect file format');
+              return;
             }
-            if (v.row < 0 || v.row > 5 || v.col < 0 || v.col > 5) {
-              throw new Error('Vehicle position out of 6x6 board bounds.');
+
+            // Orientation must be 'horizontal' or 'vertical'
+            if (v.orientation !== 'horizontal' && v.orientation !== 'vertical') {
+              setLoadError('Incorrect file format');
+              return;
             }
+
+            // Position row and col must be integers between 0 and 5
+            if (
+              typeof v.row !== 'number' ||
+              typeof v.col !== 'number' ||
+              !Number.isInteger(v.row) ||
+              !Number.isInteger(v.col) ||
+              v.row < 0 ||
+              v.row > 5 ||
+              v.col < 0 ||
+              v.col > 5
+            ) {
+              setLoadError('Incorrect file format');
+              return;
+            }
+
+            // Must fit within 6x6 board
+            if (v.orientation === 'horizontal' && v.col + resolvedLen > 6) {
+              setLoadError('Incorrect file format');
+              return;
+            }
+            if (v.orientation === 'vertical' && v.row + resolvedLen > 6) {
+              setLoadError('Incorrect file format');
+              return;
+            }
+
+            // Check for overlaps
+            for (let s = 0; s < resolvedLen; s++) {
+              const r = v.orientation === 'vertical' ? v.row + s : v.row;
+              const c = v.orientation === 'horizontal' ? v.col + s : v.col;
+              const cellKey = `${r},${c}`;
+              if (occupiedCells.has(cellKey)) {
+                setLoadError('Incorrect file format');
+                return;
+              }
+              occupiedCells.add(cellKey);
+            }
+
+            validatedVehicles.push({
+              id: String(v.id || `veh-${i + 1}`),
+              length: resolvedLen,
+              orientation: v.orientation,
+              row: v.row,
+              col: v.col,
+              color: typeof v.color === 'string' && v.color ? v.color : VEHICLE_COLOR_PALETTE[i % VEHICLE_COLOR_PALETTE.length],
+              name: typeof v.name === 'string' ? v.name : undefined,
+            });
           }
 
-          // Only then read / apply the board state
-          const validatedVehicles: Vehicle[] = loadedVehicles.map(v => ({
-            id: String(v.id),
-            length: (typeof v.length === 'number' ? v.length : ((v as any).type === 'truck' ? 3 : 2)) as 2 | 3,
-            orientation: v.orientation,
-            row: v.row,
-            col: v.col,
-            color: v.color || VEHICLE_COLOR_PALETTE[0],
-            name: v.name,
-          }));
-
+          // 4. Only then should you read and apply the board state itself
           setVehicles(validatedVehicles);
           setActivePreset(null);
           setLoadError(null);
-          soundManager.playClickSound();
-        } catch (err: any) {
-          console.error(err);
-          const msg = err.message || '';
-          const displayMsg = (msg.includes('JSON') || msg.includes('parse') || msg.includes('unexpected') || msg.includes('Unexpected') || err instanceof SyntaxError)
-            ? 'Incorrect file format'
-            : (msg || 'Incorrect file format');
-          setLoadError(displayMsg);
+          try {
+            soundManager.playClickSound();
+          } catch {}
+        } catch {
+          setLoadError('Incorrect file format');
         } finally {
-          try { if (input) input.value = ''; } catch {}
+          try {
+            if (input) input.value = '';
+          } catch {}
         }
       };
 
       reader.readAsText(file);
-    } catch (err: any) {
-      console.error('File load outer error:', err);
+    } catch {
       setLoadError('Incorrect file format');
-      try { if (input) input.value = ''; } catch {}
+      try {
+        if (input) input.value = '';
+      } catch {}
     }
   };
 
