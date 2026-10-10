@@ -65,7 +65,7 @@ export const RulesModal: React.FC<RulesModalProps> = ({ isOpen, onClose }) => {
             <div>
               <h3 className="font-semibold text-white">Real-time BFS Solver AI</h3>
               <p className="text-slate-400 mt-0.5">
-                The game runs a Breadth-First Search (BFS) graph algorithm in the background on every move to find the shortest path of legal moves. A pulsating <strong>arrow in the center of a vehicle</strong> indicates the next optimal step.
+                The game runs a Breadth-First Search (BFS) graph algorithm in the background on every move to find the best solution of legal moves. A pulsating <strong>arrow in the center of a vehicle</strong> indicates the next optimal step.
               </p>
             </div>
           </div>

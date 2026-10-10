@@ -85,7 +85,7 @@ export const WinModal: React.FC<WinModalProps> = ({
           </div>
 
           <div className="bg-slate-800/80 border border-slate-700/60 rounded-2xl p-4 flex flex-col items-center">
-            <span className="text-xs text-slate-400 font-medium">Shortest Path</span>
+            <span className="text-xs text-slate-400 font-medium">Best Solution</span>
             <span className="text-3xl font-mono font-bold text-emerald-400 tabular-nums mt-1">
               {optimalMoves > 0 ? optimalMoves : totalMoves}
             </span>

@@ -51,30 +51,39 @@ export default function App() {
 
   const handleSaveBoard = () => {
     soundManager.playClickSound();
-    const data = JSON.stringify({
-      version: 1,
-      vehicles: vehicles,
-    }, null, 2);
+    try {
+      const data = JSON.stringify({
+        version: 1,
+        vehicles: vehicles,
+      }, null, 2);
 
-    const blob = new Blob([data], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
+      const blob = new Blob([data], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
 
-    const now = new Date();
-    const yy = String(now.getFullYear()).slice(-2);
-    const mm = String(now.getMonth() + 1).padStart(2, '0');
-    const dd = String(now.getDate()).padStart(2, '0');
-    const hh = String(now.getHours()).padStart(2, '0');
-    const min = String(now.getMinutes()).padStart(2, '0');
-    const ss = String(now.getSeconds()).padStart(2, '0');
-    const filename = `rushour${yy}${mm}${dd}_${hh}${min}${ss}.txt`;
+      const now = new Date();
+      const yy = String(now.getFullYear()).slice(-2);
+      const mm = String(now.getMonth() + 1).padStart(2, '0');
+      const dd = String(now.getDate()).padStart(2, '0');
+      const hh = String(now.getHours()).padStart(2, '0');
+      const min = String(now.getMinutes()).padStart(2, '0');
+      const ss = String(now.getSeconds()).padStart(2, '0');
+      const filename = `rushour${yy}${mm}${dd}_${hh}${min}${ss}.txt`;
 
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      link.style.display = 'none';
+      document.body.appendChild(link);
+      link.click();
+      setTimeout(() => {
+        if (link.parentNode) {
+          link.parentNode.removeChild(link);
+        }
+        URL.revokeObjectURL(url);
+      }, 100);
+    } catch (err) {
+      console.error('Save board failed:', err);
+    }
   };
 
   const handleLoadClick = () => {
@@ -84,56 +93,105 @@ export default function App() {
   };
 
   const handleFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      try {
-        const content = event.target?.result as string;
-        const parsed = JSON.parse(content);
-
-        let loadedVehicles: Vehicle[] = [];
-        if (Array.isArray(parsed)) {
-          loadedVehicles = parsed;
-        } else if (parsed && typeof parsed === 'object' && Array.isArray(parsed.vehicles)) {
-          loadedVehicles = parsed.vehicles;
-        } else {
-          throw new Error('Invalid board file format: missing vehicles data.');
-        }
-
-        for (const v of loadedVehicles) {
-          const resolvedLen = typeof v.length === 'number' ? v.length : ((v as any).type === 'truck' ? 3 : 2);
-          if (!v.id || (resolvedLen !== 2 && resolvedLen !== 3) || !v.orientation || typeof v.row !== 'number' || typeof v.col !== 'number') {
-            throw new Error('Invalid vehicle properties or length in file.');
-          }
-          if (v.row < 0 || v.row > 5 || v.col < 0 || v.col > 5) {
-            throw new Error('Vehicle position out of 6x6 board bounds.');
-          }
-        }
-
-        const validatedVehicles = loadedVehicles.map(v => ({
-          ...v,
-          length: (typeof v.length === 'number' ? v.length : ((v as any).type === 'truck' ? 3 : 2)) as 2 | 3,
-          color: v.color || VEHICLE_COLOR_PALETTE[0]
-        }));
-
-        setVehicles(validatedVehicles);
-        setActivePreset(null);
-        setLoadError(null);
-        soundManager.playClickSound();
-      } catch (err: any) {
-        console.error(err);
-        setLoadError(err.message || 'Could not parse board file. Please load a valid Rush Hour board file.');
-      } finally {
-        e.target.value = '';
+    const input = e?.target;
+    try {
+      if (!input || !input.files || input.files.length === 0) {
+        return;
       }
-    };
-    reader.onerror = () => {
-      setLoadError('Failed to read file.');
-      e.target.value = '';
-    };
-    reader.readAsText(file);
+      const file = input.files[0];
+      if (!file) {
+        return;
+      }
+
+      const fileSize = typeof file.size === 'number' ? file.size : (file as any).size ? Number((file as any).size) : 1;
+      if (fileSize === 0) {
+        setLoadError('Incorrect file format');
+        try { input.value = ''; } catch {}
+        return;
+      }
+
+      const reader = new FileReader();
+
+      reader.onerror = () => {
+        setLoadError('Failed to read file.');
+        try { input.value = ''; } catch {}
+      };
+
+      reader.onload = (event) => {
+        try {
+          const content = event?.target?.result;
+          if (typeof content !== 'string' || !content.trim()) {
+            throw new Error('Incorrect file format');
+          }
+
+          // Wrapped JSON loader caught safely
+          let parsed: any;
+          try {
+            parsed = JSON.parse(content);
+          } catch {
+            throw new Error('Incorrect file format');
+          }
+
+          if (!parsed || typeof parsed !== 'object') {
+            throw new Error('Incorrect file format');
+          }
+
+          let loadedVehicles: any[] = [];
+          if (Array.isArray(parsed)) {
+            loadedVehicles = parsed;
+          } else if (Array.isArray(parsed.vehicles)) {
+            loadedVehicles = parsed.vehicles;
+          } else {
+            throw new Error('Incorrect file format');
+          }
+
+          // Verify JSON structure and vehicle properties
+          for (const v of loadedVehicles) {
+            if (!v || typeof v !== 'object') {
+              throw new Error('Incorrect file format');
+            }
+            const resolvedLen = typeof v.length === 'number' ? v.length : ((v as any).type === 'truck' ? 3 : 2);
+            if (!v.id || (resolvedLen !== 2 && resolvedLen !== 3) || !v.orientation || (v.orientation !== 'horizontal' && v.orientation !== 'vertical') || typeof v.row !== 'number' || typeof v.col !== 'number') {
+              throw new Error('Incorrect file format');
+            }
+            if (v.row < 0 || v.row > 5 || v.col < 0 || v.col > 5) {
+              throw new Error('Vehicle position out of 6x6 board bounds.');
+            }
+          }
+
+          // Only then read / apply the board state
+          const validatedVehicles: Vehicle[] = loadedVehicles.map(v => ({
+            id: String(v.id),
+            length: (typeof v.length === 'number' ? v.length : ((v as any).type === 'truck' ? 3 : 2)) as 2 | 3,
+            orientation: v.orientation,
+            row: v.row,
+            col: v.col,
+            color: v.color || VEHICLE_COLOR_PALETTE[0],
+            name: v.name,
+          }));
+
+          setVehicles(validatedVehicles);
+          setActivePreset(null);
+          setLoadError(null);
+          soundManager.playClickSound();
+        } catch (err: any) {
+          console.error(err);
+          const msg = err.message || '';
+          const displayMsg = (msg.includes('JSON') || msg.includes('parse') || msg.includes('unexpected') || msg.includes('Unexpected') || err instanceof SyntaxError)
+            ? 'Incorrect file format'
+            : (msg || 'Incorrect file format');
+          setLoadError(displayMsg);
+        } finally {
+          try { if (input) input.value = ''; } catch {}
+        }
+      };
+
+      reader.readAsText(file);
+    } catch (err: any) {
+      console.error('File load outer error:', err);
+      setLoadError('Incorrect file format');
+      try { if (input) input.value = ''; } catch {}
+    }
   };
 
   // Background BFS Solver computation
@@ -243,6 +301,7 @@ export default function App() {
     soundManager.playClickSound();
     setVehicles([]);
     setActivePreset(null);
+    setLoadError(null);
   };
 
   // Randomly generate a valid and solvable puzzle in board builder mode
@@ -516,9 +575,7 @@ export default function App() {
                     aria-label="Board Storage Controls"
                     className="w-full bg-slate-900/90 border border-slate-800 rounded-3xl p-5 flex flex-col gap-3 shadow-2xl backdrop-blur-sm shrink-0 select-none"
                   >
-                    <span className="text-xs font-semibold uppercase tracking-wider text-slate-400 text-center">
-                      Board Files
-                    </span>
+
                     <div className="flex flex-col gap-2">
                       <button
                         onClick={handleSaveBoard}
