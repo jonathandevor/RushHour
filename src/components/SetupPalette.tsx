@@ -15,6 +15,7 @@ interface SetupPaletteProps {
   onDragStartTemplate?: (dragState: { length: 2 | 3; orientation: Orientation; offsetX: number; offsetY: number }) => void;
   onDragEndTemplate?: () => void;
   cellSize?: number;
+  onRemoveVehicle?: (vehicleId: string) => void;
 }
 
 interface PaletteItem {
@@ -33,6 +34,7 @@ export const SetupPalette: React.FC<SetupPaletteProps> = ({
   onDragStartTemplate,
   onDragEndTemplate,
   cellSize,
+  onRemoveVehicle,
 }) => {
   const unit = cellSize && cellSize > 0 ? Math.min(cellSize, 68) : 68;
   const templates: PaletteItem[] = [
@@ -102,6 +104,21 @@ export const SetupPalette: React.FC<SetupPaletteProps> = ({
   return (
     <aside
       aria-label="Board Builder"
+      onDragOver={(e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+      }}
+      onDrop={(e) => {
+        e.preventDefault();
+        try {
+          const data = JSON.parse(e.dataTransfer.getData('application/json'));
+          if (data && data.vehicleId && onRemoveVehicle) {
+            onRemoveVehicle(data.vehicleId);
+          }
+        } catch {
+          // ignore
+        }
+      }}
       className="bg-slate-900/90 border border-slate-800 rounded-2xl sm:rounded-3xl p-3.5 sm:p-5 flex flex-col items-center gap-3.5 sm:gap-5 shadow-2xl backdrop-blur-sm shrink-0 select-none max-w-full"
     >
       {/* 4 Vehicles in their actual dimensions */}

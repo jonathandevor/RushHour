@@ -71,12 +71,32 @@ export default function App() {
 
   const isWideScreen = windowWidth >= 1150;
 
-  // Dynamically calculate optimal cellSize so board + frame + exit sign scale to fit the screen width
+  // Dynamically calculate optimal cellSize so board + frame + exit sign scale smoothly
+  // across all screens: smaller for mobile (down to 36px) and larger for large screens (up to 120px)
+  // so the elements fill the screen with only small gaps between windows and in margins.
   const dynamicCellSize = useMemo(() => {
-    const horizontalMargin = windowWidth < 640 ? 72 : 96;
-    const availableWidth = windowWidth - horizontalMargin;
-    return Math.max(36, Math.min(72, Math.floor(availableWidth / 6)));
-  }, [windowWidth]);
+    if (isWideScreen) {
+      // 3 columns: side panel (w-64 to w-80 ~ 260-320px) + board + side panel (260-320px) + gaps
+      // Available width for the center board: windowWidth - 2 * sideWidth - gaps
+      const sidePanelWidth = windowWidth >= 1600 ? 320 : windowWidth >= 1400 ? 280 : 256;
+      const gapsAndMargins = 96;
+      const availableForBoard = windowWidth - (2 * sidePanelWidth) - gapsAndMargins;
+      // Also respect viewport height so board fits comfortably vertically without scroll
+      const windowHeight = typeof window !== 'undefined' ? window.innerHeight : 800;
+      const availableHeightForBoard = windowHeight - 160;
+      const maxByDimension = Math.min(
+        Math.floor(availableForBoard / 6),
+        Math.floor(availableHeightForBoard / 6)
+      );
+      // Allow scaling up to 120px for large displays
+      return Math.max(72, Math.min(120, maxByDimension));
+    } else {
+      // Single column layout on narrow screens
+      const horizontalMargin = windowWidth < 640 ? 56 : 80;
+      const availableWidth = windowWidth - horizontalMargin;
+      return Math.max(36, Math.min(84, Math.floor(availableWidth / 6)));
+    }
+  }, [windowWidth, isWideScreen]);
 
   const handleSaveBoard = () => {
     soundManager.playClickSound();
@@ -641,14 +661,14 @@ export default function App() {
         mode={mode}
       />
 
-      {/* Main Game Stage */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-2 sm:px-6 lg:px-8 py-3 sm:py-6 flex flex-col items-center justify-start">
+      {/* Main Game Stage - scales to fill the screen on large monitors */}
+      <main className="flex-1 w-full mx-auto px-2 sm:px-6 lg:px-8 py-3 sm:py-6 flex flex-col items-center justify-start">
         {isWideScreen ? (
           /* Desktop Balanced 3-Column Layout */
-          <div className="w-full flex justify-center items-start gap-6">
+          <div className="w-full max-w-full flex justify-center items-start gap-4 sm:gap-6 lg:gap-8">
             {mode === 'SETUP' ? (
               <>
-                <div className="w-64 shrink-0 flex justify-end">
+                <div className="w-64 xl:w-72 2xl:w-80 shrink-0 flex justify-end">
                   <SetupPalette
                     onDone={handleDoneSetup}
                     onClearBoard={handleClearBoard}
@@ -657,6 +677,7 @@ export default function App() {
                     onDragStartTemplate={setActiveDragState}
                     onDragEndTemplate={() => setActiveDragState(null)}
                     cellSize={dynamicCellSize}
+                    onRemoveVehicle={handleRemoveVehicle}
                   />
                 </div>
                 <div className="shrink-0 flex items-center justify-center">
@@ -675,7 +696,7 @@ export default function App() {
                     cellSize={dynamicCellSize}
                   />
                 </div>
-                <div className="w-64 shrink-0 flex flex-col gap-4">
+                <div className="w-64 xl:w-72 2xl:w-80 shrink-0 flex flex-col items-start justify-start gap-4 -ml-8 sm:-ml-10 lg:-ml-12">
                   {vehicles.length > 0 && (
                     <aside
                       aria-label="Board Solver Status"
@@ -722,7 +743,7 @@ export default function App() {
                         className="w-full py-2.5 px-4 rounded-xl font-medium text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700/80 flex items-center justify-center gap-2 transition-all active:scale-[0.98] cursor-pointer"
                       >
                         <Save className="w-3.5 h-3.5 text-blue-400" />
-                        <span>Save Board State</span>
+                        <span>Save Board</span>
                       </button>
 
                       <button
@@ -730,7 +751,7 @@ export default function App() {
                         className="w-full py-2.5 px-4 rounded-xl font-medium text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700/80 flex items-center justify-center gap-2 transition-all active:scale-[0.98] cursor-pointer"
                       >
                         <FolderOpen className="w-3.5 h-3.5 text-amber-400" />
-                        <span>Load Board State</span>
+                        <span>Load Board</span>
                       </button>
                     </div>
 
@@ -756,7 +777,7 @@ export default function App() {
               </>
             ) : (
               <>
-                <div className="w-64 shrink-0">
+                <div className="w-64 xl:w-72 2xl:w-80 shrink-0">
                   <aside
                     aria-label="Game Controls"
                     className="w-full bg-slate-900/90 border border-slate-800 rounded-3xl p-5 flex flex-col gap-4 shadow-2xl backdrop-blur-sm select-none"
@@ -886,7 +907,7 @@ export default function App() {
                   />
                 </div>
                 {/* Invisible Spacer for dead-center balance in PLAY mode */}
-                <div className="w-64 shrink-0 invisible pointer-events-none" aria-hidden="true" />
+                <div className="w-64 xl:w-72 2xl:w-80 shrink-0 invisible pointer-events-none" aria-hidden="true" />
               </>
             )}
           </div>
@@ -1036,6 +1057,7 @@ export default function App() {
                     onDragStartTemplate={setActiveDragState}
                     onDragEndTemplate={() => setActiveDragState(null)}
                     cellSize={dynamicCellSize}
+                    onRemoveVehicle={handleRemoveVehicle}
                   />
                 </div>
 
@@ -1086,7 +1108,7 @@ export default function App() {
                         className="w-full py-2 sm:py-2.5 px-3 sm:px-4 rounded-lg sm:rounded-xl font-medium text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700/80 flex items-center justify-center gap-2 transition-all active:scale-[0.98] cursor-pointer"
                       >
                         <Save className="w-3.5 h-3.5 text-blue-400" />
-                        <span>Save Board State</span>
+                        <span>Save Board</span>
                       </button>
 
                       <button
@@ -1094,7 +1116,7 @@ export default function App() {
                         className="w-full py-2 sm:py-2.5 px-3 sm:px-4 rounded-lg sm:rounded-xl font-medium text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700/80 flex items-center justify-center gap-2 transition-all active:scale-[0.98] cursor-pointer"
                       >
                         <FolderOpen className="w-3.5 h-3.5 text-amber-400" />
-                        <span>Load Board State</span>
+                        <span>Load Board</span>
                       </button>
                     </div>
 
