@@ -102,6 +102,7 @@ export default function App() {
   };
 
   const handleFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const INVALID_FILE_MSG = 'Incorrect file format.';
     const input = e?.target;
     try {
       if (!input || !input.files || input.files.length === 0) {
@@ -111,8 +112,6 @@ export default function App() {
       if (!file) {
         return;
       }
-
-      const INVALID_FILE_MSG = 'Incorrect file format.';
 
       // 1. First verify that the file exists and is valid
       const fileSize = typeof file.size === 'number' ? file.size : (file as any).size ? Number((file as any).size) : 1;
@@ -260,7 +259,7 @@ export default function App() {
 
       reader.readAsText(file);
     } catch {
-      setLoadError('Incorrect file format.');
+      setLoadError(INVALID_FILE_MSG);
       try {
         if (input) input.value = '';
       } catch {}
