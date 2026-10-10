@@ -17,7 +17,7 @@ export function buildOccupancyGrid(vehicles: Vehicle[]): boolean[][] | null {
   const grid: boolean[][] = Array.from({ length: 6 }, () => Array(6).fill(false));
 
   for (const v of vehicles) {
-    const len = v.type === 'car' ? 2 : 3;
+    const len = v.length;
     for (let i = 0; i < len; i++) {
       const r = v.orientation === 'vertical' ? v.row + i : v.row;
       const c = v.orientation === 'horizontal' ? v.col + i : v.col;
@@ -40,16 +40,11 @@ export function buildOccupancyGrid(vehicles: Vehicle[]): boolean[][] | null {
  * (within 6x6 grid, no overlaps with other vehicles).
  */
 export function isValidPlacement(
-  candidate: { row: number; col: number; orientation: 'horizontal' | 'vertical'; type: 'car' | 'truck' },
+  candidate: { row: number; col: number; orientation: 'horizontal' | 'vertical'; length: 2 | 3 },
   existingVehicles: Vehicle[],
   ignoreId?: string
 ): boolean {
-  const len = candidate.type === 'car' ? 2 : 3;
-
-  // If placing or relocating the target Red Car, it must be on row 2 horizontally
-  if (ignoreId === 'red' && candidate.row !== 2) {
-    return false;
-  }
+  const len = candidate.length;
 
   // Check board boundary
   if (candidate.orientation === 'horizontal') {
@@ -63,7 +58,7 @@ export function isValidPlacement(
   // Check collision with existing
   for (const existing of existingVehicles) {
     if (ignoreId && existing.id === ignoreId) continue;
-    const exLen = existing.type === 'car' ? 2 : 3;
+    const exLen = existing.length;
 
     // Check every cell of candidate against every cell of existing
     for (let ci = 0; ci < len; ci++) {
@@ -92,7 +87,7 @@ export function canMoveOneStep(
   direction: MoveDirection,
   vehicles: Vehicle[]
 ): boolean {
-  const len = vehicle.type === 'car' ? 2 : 3;
+  const len = vehicle.length;
 
   if (vehicle.orientation === 'horizontal') {
     if (direction === 'left') {
@@ -130,7 +125,7 @@ export function canMoveOneStep(
 function isCellOccupied(row: number, col: number, vehicles: Vehicle[], ignoreVehicleId?: string): boolean {
   for (const v of vehicles) {
     if (ignoreVehicleId && v.id === ignoreVehicleId) continue;
-    const len = v.type === 'car' ? 2 : 3;
+    const len = v.length;
     for (let i = 0; i < len; i++) {
       const r = v.orientation === 'vertical' ? v.row + i : v.row;
       const c = v.orientation === 'horizontal' ? v.col + i : v.col;
@@ -143,50 +138,36 @@ function isCellOccupied(row: number, col: number, vehicles: Vehicle[], ignoreVeh
 /**
  * Breadth-First Search (BFS) Solver
  * Computes the minimum 1-step moves to solve the board and identifies
- * the exact first move for the optimal path.
+ * the exact first move for the optimal path. Any horizontal vehicle on row 2 can exit.
  */
 export function solveBoardBFS(vehicles: Vehicle[]): SolverResult {
-  let carIndex = vehicles.findIndex(
-    (v) => v.isTarget && v.row === 2 && v.orientation === 'horizontal'
-  );
-  if (carIndex === -1) {
-    carIndex = vehicles.findIndex(
-      (v) => v.row === 2 && v.orientation === 'horizontal'
-    );
-  }
-  if (carIndex === -1) {
-    return { solvable: false, minMoves: 0, nextMove: null };
-  }
-
-  const targetCar = vehicles[carIndex];
-  // Target vehicle must be horizontal on row 2
-  if (targetCar.row !== 2 || targetCar.orientation !== 'horizontal') {
-    return { solvable: false, minMoves: 0, nextMove: null };
-  }
-
-  const len = targetCar.type === 'car' ? 2 : 3;
-  const winningCol = 6 - len;
-
-  // If already at exit or exited:
-  if (targetCar.col >= winningCol) {
-    return { solvable: true, minMoves: 0, nextMove: null, fullPath: [] };
-  }
-
-  // Pre-extract constant vehicle metadata for blazing-fast state simulation
   const numVehicles = vehicles.length;
   const isHorizontal: boolean[] = [];
   const lengths: number[] = [];
   const fixedCoords: number[] = [];
   const initialPositions: number[] = [];
   const ids: string[] = [];
+  const exitVehicleIndices: number[] = [];
 
   for (let i = 0; i < numVehicles; i++) {
     const v = vehicles[i];
-    isHorizontal.push(v.orientation === 'horizontal');
-    lengths.push(v.type === 'car' ? 2 : 3);
-    fixedCoords.push(v.orientation === 'horizontal' ? v.row : v.col);
-    initialPositions.push(v.orientation === 'horizontal' ? v.col : v.row);
+    const isH = v.orientation === 'horizontal';
+    isHorizontal.push(isH);
+    const len = v.length;
+    lengths.push(len);
+    const fixed = isH ? v.row : v.col;
+    fixedCoords.push(fixed);
+    const pos = isH ? v.col : v.row;
+    initialPositions.push(pos);
     ids.push(v.id);
+
+    if (isH && v.row === 2) {
+      exitVehicleIndices.push(i);
+    }
+  }
+
+  if (exitVehicleIndices.length === 0) {
+    return { solvable: false, minMoves: 0, nextMove: null };
   }
 
   // Helper to pack state into a string
@@ -223,16 +204,17 @@ export function solveBoardBFS(vehicles: Vehicle[]): SolverResult {
   const startStateStr = encodeState(initialPositions);
 
   // If already winning:
-  if (initialPositions[carIndex] === winningCol) {
-    // Check if exiting move is open
-    const grid = getGridFromPositions(initialPositions);
-    return {
-      solvable: true,
-      minMoves: 1,
-      nextMove: { vehicleId: ids[carIndex], direction: 'right', distance: 1 },
-      fullPath: [{ vehicleId: ids[carIndex], direction: 'right', distance: 1 }],
-      visitedNodesCount: 1,
-    };
+  for (const idx of exitVehicleIndices) {
+    const winningCol = 6 - lengths[idx];
+    if (initialPositions[idx] >= winningCol) {
+      return {
+        solvable: true,
+        minMoves: 0,
+        nextMove: { vehicleId: ids[idx], direction: 'right', distance: 1 },
+        fullPath: [],
+        visitedNodesCount: 1,
+      };
+    }
   }
 
   // BFS Queue: store state key and step to reach it
@@ -260,9 +242,17 @@ export function solveBoardBFS(vehicles: Vehicle[]): SolverResult {
     const curKey = current.key;
 
     // Check if goal reached in this state:
-    if (curPos[carIndex] === winningCol) {
+    let matchedExitIdx = -1;
+    for (const idx of exitVehicleIndices) {
+      const winningCol = 6 - lengths[idx];
+      if (curPos[idx] === winningCol) {
+        matchedExitIdx = idx;
+        break;
+      }
+    }
+    if (matchedExitIdx !== -1) {
       winningKey = curKey;
-      exitFinalStep = { vehicleId: ids[carIndex], direction: 'right', distance: 1 };
+      exitFinalStep = { vehicleId: ids[matchedExitIdx], direction: 'right', distance: 1 };
       break;
     }
 
@@ -314,9 +304,10 @@ export function solveBoardBFS(vehicles: Vehicle[]): SolverResult {
             visitedMap.set(nextKey, { prevStateKey: curKey, step });
 
             // Quick goal check if vehicle reached winningCol
-            if (i === carIndex && nextPos[carIndex] === winningCol) {
+            const winningCol = 6 - len;
+            if (exitVehicleIndices.includes(i) && nextPos[i] === winningCol) {
               winningKey = nextKey;
-              exitFinalStep = { vehicleId: ids[carIndex], direction: 'right', distance: 1 };
+              exitFinalStep = { vehicleId: ids[i], direction: 'right', distance: 1 };
               break;
             }
 

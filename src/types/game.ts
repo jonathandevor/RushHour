@@ -4,14 +4,12 @@
  */
 
 export type Orientation = 'horizontal' | 'vertical';
-export type VehicleType = 'car' | 'truck';
 export type GameMode = 'SETUP' | 'PLAY';
 export type MoveDirection = 'left' | 'right' | 'up' | 'down';
 
 export interface Vehicle {
   id: string;
-  isTarget: boolean; // true exclusively for the Red Car
-  type: VehicleType; // 'car' (len 2) | 'truck' (len 3)
+  length: 2 | 3; // integer values 2 or 3
   orientation: Orientation;
   row: number; // 0-indexed anchor row (0 to 5)
   col: number; // 0-indexed anchor col (0 to 5)
@@ -48,7 +46,7 @@ export interface PuzzlePreset {
 }
 
 export interface ActiveDragState {
-  type: VehicleType;
+  length: 2 | 3;
   orientation: Orientation;
   offsetX: number;
   offsetY: number;

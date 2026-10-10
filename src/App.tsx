@@ -3,8 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useMemo, useCallback } from 'react';
-import { Vehicle, GameMode, MoveDirection, SolverResult, PuzzlePreset, VehicleType, Orientation, ActiveDragState } from './types/game';
+import React, { useState, useMemo, useCallback, useRef } from 'react';
+import { Vehicle, GameMode, MoveDirection, SolverResult, PuzzlePreset, Orientation, ActiveDragState } from './types/game';
 import { CLASSIC_PRESETS, VEHICLE_COLOR_PALETTE } from './data/presets';
 import { solveBoardBFS, canMoveOneStep, isValidPlacement } from './utils/solver';
 import { soundManager } from './utils/audio';
@@ -20,6 +20,8 @@ import {
   Lightbulb,
   CheckCircle2,
   AlertTriangle,
+  Save,
+  FolderOpen,
 } from 'lucide-react';
 
 export default function App() {
@@ -43,6 +45,96 @@ export default function App() {
 
   // Next color index counter for newly dragged vehicles
   const [colorCounter, setColorCounter] = useState<number>(0);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const handleSaveBoard = () => {
+    soundManager.playClickSound();
+    const data = JSON.stringify({
+      version: 1,
+      vehicles: vehicles,
+    }, null, 2);
+
+    const blob = new Blob([data], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+
+    const now = new Date();
+    const yy = String(now.getFullYear()).slice(-2);
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const dd = String(now.getDate()).padStart(2, '0');
+    const hh = String(now.getHours()).padStart(2, '0');
+    const min = String(now.getMinutes()).padStart(2, '0');
+    const ss = String(now.getSeconds()).padStart(2, '0');
+    const filename = `rushour${yy}${mm}${dd}_${hh}${min}${ss}.txt`;
+
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleLoadClick = () => {
+    soundManager.playClickSound();
+    setLoadError(null);
+    fileInputRef.current?.click();
+  };
+
+  const handleFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const content = event.target?.result as string;
+        const parsed = JSON.parse(content);
+
+        let loadedVehicles: Vehicle[] = [];
+        if (Array.isArray(parsed)) {
+          loadedVehicles = parsed;
+        } else if (parsed && typeof parsed === 'object' && Array.isArray(parsed.vehicles)) {
+          loadedVehicles = parsed.vehicles;
+        } else {
+          throw new Error('Invalid board file format: missing vehicles data.');
+        }
+
+        for (const v of loadedVehicles) {
+          const resolvedLen = typeof v.length === 'number' ? v.length : ((v as any).type === 'truck' ? 3 : 2);
+          if (!v.id || (resolvedLen !== 2 && resolvedLen !== 3) || !v.orientation || typeof v.row !== 'number' || typeof v.col !== 'number') {
+            throw new Error('Invalid vehicle properties or length in file.');
+          }
+          if (v.row < 0 || v.row > 5 || v.col < 0 || v.col > 5) {
+            throw new Error('Vehicle position out of 6x6 board bounds.');
+          }
+        }
+
+        const validatedVehicles = loadedVehicles.map(v => ({
+          ...v,
+          length: (typeof v.length === 'number' ? v.length : ((v as any).type === 'truck' ? 3 : 2)) as 2 | 3,
+          color: v.color || VEHICLE_COLOR_PALETTE[0]
+        }));
+
+        setVehicles(validatedVehicles);
+        setActivePreset(null);
+        setLoadError(null);
+        soundManager.playClickSound();
+      } catch (err: any) {
+        console.error(err);
+        setLoadError(err.message || 'Could not parse board file. Please load a valid Rush Hour board file.');
+      } finally {
+        e.target.value = '';
+      }
+    };
+    reader.onerror = () => {
+      setLoadError('Failed to read file.');
+      e.target.value = '';
+    };
+    reader.readAsText(file);
+  };
 
   // Background BFS Solver computation
   const solverResult: SolverResult = useMemo(() => {
@@ -99,20 +191,23 @@ export default function App() {
 
   // Place a new vehicle from palette onto board
   const handlePlaceVehicle = (newVeh: {
-    type: VehicleType;
+    length: 2 | 3;
     orientation: Orientation;
     row: number;
     col: number;
   }) => {
-    const isOnRow2 = newVeh.orientation === 'horizontal' && newVeh.row === 2;
     const nextColor = VEHICLE_COLOR_PALETTE[colorCounter % VEHICLE_COLOR_PALETTE.length];
     setColorCounter((prev) => prev + 1);
 
-    const vehicleId = `veh-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    const maxIdNum = vehicles.reduce((max, v) => {
+      const num = parseInt(v.id, 10);
+      return !isNaN(num) && num > max ? num : max;
+    }, 0);
+    const vehicleId = String(maxIdNum + 1);
+
     const created: Vehicle = {
       id: vehicleId,
-      isTarget: isOnRow2,
-      type: newVeh.type,
+      length: newVeh.length,
       orientation: newVeh.orientation,
       row: newVeh.row,
       col: newVeh.col,
@@ -128,8 +223,7 @@ export default function App() {
     setVehicles((prev) =>
       prev.map((v) => {
         if (v.id === vehicleId) {
-          const isOnRow2 = v.orientation === 'horizontal' && newRow === 2;
-          return { ...v, row: newRow, col: newCol, isTarget: isOnRow2 };
+          return { ...v, row: newRow, col: newCol };
         }
         return v;
       })
@@ -158,15 +252,13 @@ export default function App() {
     let currentVehicles: Vehicle[] = [];
 
     // 1. First place a horizontal vehicle in the exit row (row 2) at least 2 spaces from exit (col + len <= 4)
-    const firstType: VehicleType = Math.random() < 0.6 ? 'car' : 'truck';
-    const firstLen = firstType === 'car' ? 2 : 3;
-    const maxCol = 4 - firstLen; // ensures col + len <= 4 (at least 2 spaces from exit at col 6)
+    const firstLength: 2 | 3 = Math.random() < 0.6 ? 2 : 3;
+    const maxCol = 4 - firstLength; // ensures col + len <= 4 (at least 2 spaces from exit at col 6)
     const firstCol = Math.floor(Math.random() * (maxCol + 1));
 
     const firstVehicle: Vehicle = {
-      id: `veh-${Date.now()}-target`,
-      isTarget: true,
-      type: firstType,
+      id: '1',
+      length: firstLength,
       orientation: 'horizontal',
       row: 2,
       col: firstCol,
@@ -183,14 +275,14 @@ export default function App() {
 
     while (attempts < maxAttempts) {
       attempts++;
-      const randType: VehicleType = Math.random() < 0.6 ? 'car' : 'truck';
+      const randLength: 2 | 3 = Math.random() < 0.6 ? 2 : 3;
       const randOrientation: Orientation = Math.random() < 0.5 ? 'horizontal' : 'vertical';
       const randRow = Math.floor(Math.random() * 6);
       const randCol = Math.floor(Math.random() * 6);
       const randColor = VEHICLE_COLOR_PALETTE[Math.floor(Math.random() * VEHICLE_COLOR_PALETTE.length)];
 
       const candidate = {
-        type: randType,
+        length: randLength,
         orientation: randOrientation,
         row: randRow,
         col: randCol,
@@ -199,9 +291,8 @@ export default function App() {
       // Check if placement is valid (entirely on board, no overlap)
       if (isValidPlacement(candidate, currentVehicles)) {
         const candidateVehicle: Vehicle = {
-          id: `veh-${Date.now()}-${Math.floor(Math.random() * 10000)}`,
-          isTarget: false,
-          type: randType,
+          id: String(currentVehicles.length + 1),
+          length: randLength,
           orientation: randOrientation,
           row: randRow,
           col: randCol,
@@ -222,7 +313,12 @@ export default function App() {
       }
     }
 
-    setVehicles(lastSolvableVehicles);
+    const numberedVehicles = lastSolvableVehicles.map((v, idx) => ({
+      ...v,
+      id: String(idx + 1),
+    }));
+
+    setVehicles(numberedVehicles);
     setActivePreset(null);
   };
 
@@ -230,7 +326,11 @@ export default function App() {
   const handleSelectPreset = (preset: PuzzlePreset) => {
     soundManager.playClickSound();
     setActivePreset(preset);
-    setVehicles(JSON.parse(JSON.stringify(preset.vehicles)));
+    const numbered = preset.vehicles.map((v, idx) => ({
+      ...v,
+      id: String(idx + 1),
+    }));
+    setVehicles(JSON.parse(JSON.stringify(numbered)));
   };
 
   // Execute a 1-step move for a vehicle
@@ -245,8 +345,8 @@ export default function App() {
         return false;
       }
 
-      // Check win move for any vehicle (car or truck) exiting through row 2
-      const exitingLen = targetVehicle.type === 'car' ? 2 : 3;
+      // Check win move for any vehicle exiting through row 2
+      const exitingLen = targetVehicle.length;
       const winningCol = 6 - exitingLen;
       const isExitingVehicle = targetVehicle.row === 2 && targetVehicle.orientation === 'horizontal';
       if (
@@ -374,12 +474,12 @@ export default function App() {
                   />
                 </div>
 
-                {/* SETUP MODE: Solver status rectangle to the right of the board */}
-                {vehicles.length > 0 && (
-                  <div className="absolute left-[calc(100%+24px)] top-0">
+                {/* SETUP MODE: Solver status & Save/Load controls to the right of the board */}
+                <div className="absolute left-[calc(100%+24px)] top-0 flex flex-col gap-4 w-64">
+                  {vehicles.length > 0 && (
                     <aside
                       aria-label="Board Solver Status"
-                      className="w-64 bg-slate-900/90 border border-slate-800 rounded-3xl p-5 flex flex-col gap-4 shadow-2xl backdrop-blur-sm shrink-0 select-none"
+                      className="w-full bg-slate-900/90 border border-slate-800 rounded-3xl p-5 flex flex-col gap-4 shadow-2xl backdrop-blur-sm shrink-0 select-none"
                     >
                       <span className="text-xs font-semibold uppercase tracking-wider text-slate-400 text-center">
                         Board Status
@@ -410,8 +510,52 @@ export default function App() {
                         )}
                       </div>
                     </aside>
-                  </div>
-                )}
+                  )}
+
+                  <aside
+                    aria-label="Board Storage Controls"
+                    className="w-full bg-slate-900/90 border border-slate-800 rounded-3xl p-5 flex flex-col gap-3 shadow-2xl backdrop-blur-sm shrink-0 select-none"
+                  >
+                    <span className="text-xs font-semibold uppercase tracking-wider text-slate-400 text-center">
+                      Board Files
+                    </span>
+                    <div className="flex flex-col gap-2">
+                      <button
+                        onClick={handleSaveBoard}
+                        className="w-full py-2.5 px-4 rounded-xl font-medium text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700/80 flex items-center justify-center gap-2 transition-all active:scale-[0.98] cursor-pointer"
+                      >
+                        <Save className="w-3.5 h-3.5 text-blue-400" />
+                        <span>Save Board State</span>
+                      </button>
+
+                      <button
+                        onClick={handleLoadClick}
+                        className="w-full py-2.5 px-4 rounded-xl font-medium text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700/80 flex items-center justify-center gap-2 transition-all active:scale-[0.98] cursor-pointer"
+                      >
+                        <FolderOpen className="w-3.5 h-3.5 text-amber-400" />
+                        <span>Load Board State</span>
+                      </button>
+                    </div>
+
+                    {loadError && (
+                      <div className="bg-rose-500/10 border border-rose-500/30 rounded-xl p-3 flex flex-col gap-1.5 text-rose-300 text-xs">
+                        <div className="flex items-center gap-1.5 font-semibold">
+                          <AlertTriangle className="w-4 h-4 shrink-0" />
+                          <span>Load Error</span>
+                        </div>
+                        <p className="text-rose-300/90 leading-relaxed">{loadError}</p>
+                      </div>
+                    )}
+
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      onChange={handleFileSelected}
+                      accept=".txt,text/plain"
+                      className="hidden"
+                    />
+                  </aside>
+                </div>
               </>
             )}
 

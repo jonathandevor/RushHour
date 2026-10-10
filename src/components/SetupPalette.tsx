@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { VehicleType, Orientation } from '../types/game';
+import { Orientation } from '../types/game';
 import { Play, Trash2, Shuffle } from 'lucide-react';
 
 interface SetupPaletteProps {
@@ -12,13 +12,13 @@ interface SetupPaletteProps {
   onClearBoard: () => void;
   onRandom: () => void;
   hasRedCar: boolean;
-  onDragStartTemplate?: (dragState: { type: VehicleType; orientation: Orientation; offsetX: number; offsetY: number }) => void;
+  onDragStartTemplate?: (dragState: { length: 2 | 3; orientation: Orientation; offsetX: number; offsetY: number }) => void;
   onDragEndTemplate?: () => void;
 }
 
 interface PaletteItem {
   id: string;
-  type: VehicleType;
+  length: 2 | 3;
   orientation: Orientation;
   color: string;
   widthPx: number;
@@ -29,7 +29,7 @@ interface PaletteItem {
 const PALETTE_TEMPLATES: PaletteItem[] = [
   {
     id: 'h-car',
-    type: 'car',
+    length: 2,
     orientation: 'horizontal',
     color: '#06b6d4',
     widthPx: 144, // 2 × 72px
@@ -37,7 +37,7 @@ const PALETTE_TEMPLATES: PaletteItem[] = [
   },
   {
     id: 'h-truck',
-    type: 'truck',
+    length: 3,
     orientation: 'horizontal',
     color: '#3b82f6',
     widthPx: 216, // 3 × 72px
@@ -45,7 +45,7 @@ const PALETTE_TEMPLATES: PaletteItem[] = [
   },
   {
     id: 'v-car',
-    type: 'car',
+    length: 2,
     orientation: 'vertical',
     color: '#10b981',
     widthPx: 72, // 1 × 72px
@@ -53,7 +53,7 @@ const PALETTE_TEMPLATES: PaletteItem[] = [
   },
   {
     id: 'v-truck',
-    type: 'truck',
+    length: 3,
     orientation: 'vertical',
     color: '#f59e0b',
     widthPx: 72, // 1 × 72px
@@ -76,7 +76,7 @@ export const SetupPalette: React.FC<SetupPaletteProps> = ({
     e.dataTransfer.setData(
       'application/json',
       JSON.stringify({
-        type: item.type,
+        length: item.length,
         orientation: item.orientation,
         isNew: true,
         offsetX,
@@ -86,7 +86,7 @@ export const SetupPalette: React.FC<SetupPaletteProps> = ({
     e.dataTransfer.effectAllowed = 'copy';
 
     onDragStartTemplate?.({
-      type: item.type,
+      length: item.length,
       orientation: item.orientation,
       offsetX,
       offsetY,

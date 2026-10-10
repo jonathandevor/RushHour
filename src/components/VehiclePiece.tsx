@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useRef } from 'react';
-import { Vehicle, GameMode, MoveDirection, SolverStep, VehicleType, Orientation } from '../types/game';
+import { Vehicle, GameMode, MoveDirection, SolverStep, Orientation } from '../types/game';
 import { ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Trash2 } from 'lucide-react';
 
 interface VehiclePieceProps {
@@ -16,7 +16,7 @@ interface VehiclePieceProps {
   onMoveOneStep: (vehicleId: string, direction: MoveDirection) => boolean;
   onRemove?: (vehicleId: string) => void;
   isExitingWin?: boolean;
-  onDragStartExisting?: (dragState: { type: VehicleType; orientation: Orientation; vehicleId: string; offsetX: number; offsetY: number }) => void;
+  onDragStartExisting?: (dragState: { length: 2 | 3; orientation: Orientation; vehicleId: string; offsetX: number; offsetY: number }) => void;
   onDragEndExisting?: () => void;
 }
 
@@ -37,7 +37,7 @@ export const VehiclePiece: React.FC<VehiclePieceProps> = ({
   const dragStartPos = useRef<{ x: number; y: number } | null>(null);
 
   const isH = vehicle.orientation === 'horizontal';
-  const len = vehicle.type === 'car' ? 2 : 3;
+  const len = vehicle.length;
 
   // Exact pixel bounds on the grid
   const widthPx = isH ? len * cellSize + (len - 1) * gapSize : cellSize;
@@ -59,7 +59,7 @@ export const VehiclePiece: React.FC<VehiclePieceProps> = ({
     e.dataTransfer.setData(
       'application/json',
       JSON.stringify({
-        type: vehicle.type,
+        length: vehicle.length,
         orientation: vehicle.orientation,
         vehicleId: vehicle.id,
         isExisting: true,
@@ -70,7 +70,7 @@ export const VehiclePiece: React.FC<VehiclePieceProps> = ({
     e.dataTransfer.effectAllowed = 'move';
 
     onDragStartExisting?.({
-      type: vehicle.type,
+      length: vehicle.length,
       orientation: vehicle.orientation,
       vehicleId: vehicle.id,
       offsetX,
@@ -149,13 +149,11 @@ export const VehiclePiece: React.FC<VehiclePieceProps> = ({
     dragStartPos.current = null;
   };
 
-  const isRed = vehicle.isTarget;
-
   return (
     <div
       role="button"
       tabIndex={0}
-      aria-label={`${isRed ? 'Target Red Car' : `${vehicle.type} ${vehicle.color}`}, at row ${vehicle.row + 1}, col ${vehicle.col + 1}`}
+      aria-label={`vehicle length ${vehicle.length} ${vehicle.color}, at row ${vehicle.row + 1}, col ${vehicle.col + 1}`}
       draggable={mode === 'SETUP'}
       onDragStart={handleDragStartSetup}
       onDragEnd={handleDragEndSetup}
@@ -176,19 +174,12 @@ export const VehiclePiece: React.FC<VehiclePieceProps> = ({
     >
       {/* Main Vehicle Body Frame */}
       <div
-        className={`w-full h-full rounded-xl flex items-center justify-center relative overflow-hidden shadow-md border
-          ${
-            isRed
-              ? 'bg-gradient-to-br from-red-500 via-rose-600 to-red-700 border-red-400/40 text-white shadow-red-950/40'
-              : 'border-white/20 text-white shadow-black/40'
-          }
+        className={`w-full h-full rounded-xl flex items-center justify-center relative overflow-hidden shadow-md border border-white/20 text-white shadow-black/40
           ${isHintVehicle ? 'ring-2 ring-amber-400 ring-offset-2 ring-offset-slate-900 shadow-lg shadow-amber-500/20' : ''}
         `}
         style={{
-          backgroundColor: isRed ? undefined : vehicle.color,
-          boxShadow: isRed
-            ? '0 6px 16px -4px rgba(225, 29, 72, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.3)'
-            : '0 4px 12px -2px rgba(0, 0, 0, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.25)',
+          backgroundColor: vehicle.color,
+          boxShadow: '0 4px 12px -2px rgba(0, 0, 0, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.25)',
         }}
       >
         {/* Cab / Hood / Roof Structure */}
@@ -197,16 +188,12 @@ export const VehiclePiece: React.FC<VehiclePieceProps> = ({
             <div className="w-1.5 h-3/5 rounded-sm bg-black/25 shrink-0" />
             <div className="flex-1 h-3/4 mx-1.5 rounded-lg bg-black/20 border border-white/10 flex items-center justify-center relative overflow-hidden">
               <div className="absolute inset-x-2 top-1 h-1 bg-white/20 rounded-full" />
-              {vehicle.type === 'truck' ? (
+              {vehicle.length === 3 ? (
                 <div className="flex items-center gap-1.5 opacity-30">
                   <div className="w-0.5 h-6 bg-white" />
                   <div className="w-0.5 h-6 bg-white" />
                   <div className="w-0.5 h-6 bg-white" />
                   <div className="w-0.5 h-6 bg-white" />
-                </div>
-              ) : isRed ? (
-                <div className="flex items-center gap-1">
-                  <div className="h-1 w-6 bg-white/40 rounded-full" />
                 </div>
               ) : (
                 <div className="w-5 h-2 rounded bg-black/20" />
@@ -225,7 +212,7 @@ export const VehiclePiece: React.FC<VehiclePieceProps> = ({
             </div>
             <div className="flex-1 w-3/4 my-1.5 rounded-lg bg-black/20 border border-white/10 flex flex-col items-center justify-center relative overflow-hidden">
               <div className="absolute inset-y-2 left-1 w-1 bg-white/20 rounded-full" />
-              {vehicle.type === 'truck' ? (
+              {vehicle.length === 3 ? (
                 <div className="flex flex-col items-center gap-1.5 opacity-30">
                   <div className="h-0.5 w-6 bg-white" />
                   <div className="h-0.5 w-6 bg-white" />

@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useRef } from 'react';
-import { Vehicle, GameMode, MoveDirection, SolverStep, VehicleType, Orientation } from '../types/game';
+import { Vehicle, GameMode, MoveDirection, SolverStep, Orientation } from '../types/game';
 import { VehiclePiece } from './VehiclePiece';
 import { isValidPlacement } from '../utils/solver';
 import { soundManager } from '../utils/audio';
@@ -15,12 +15,12 @@ interface BoardProps {
   mode: GameMode;
   nextMove: SolverStep | null;
   onMoveOneStep: (vehicleId: string, direction: MoveDirection) => boolean;
-  onPlaceVehicle: (vehicle: { type: VehicleType; orientation: Orientation; row: number; col: number }) => void;
+  onPlaceVehicle: (vehicle: { length: 2 | 3; orientation: Orientation; row: number; col: number }) => void;
   onRelocateVehicle?: (vehicleId: string, row: number, col: number) => void;
   onRemoveVehicle: (vehicleId: string) => void;
   isWinningSequence: boolean;
-  activeDragState?: { type: VehicleType; orientation: Orientation; offsetX: number; offsetY: number; vehicleId?: string } | null;
-  onDragStartExisting?: (dragState: { type: VehicleType; orientation: Orientation; vehicleId: string; offsetX: number; offsetY: number }) => void;
+  activeDragState?: { length: 2 | 3; orientation: Orientation; offsetX: number; offsetY: number; vehicleId?: string } | null;
+  onDragStartExisting?: (dragState: { length: 2 | 3; orientation: Orientation; vehicleId: string; offsetX: number; offsetY: number }) => void;
   onDragEndExisting?: () => void;
 }
 
@@ -61,7 +61,7 @@ export const Board: React.FC<BoardProps> = ({
     const offsetX = activeDragState?.offsetX ?? (CELL_SIZE / 2);
     const offsetY = activeDragState?.offsetY ?? (CELL_SIZE / 2);
 
-    const type = activeDragState?.type ?? 'car';
+    const length = activeDragState?.length ?? 2;
     const orientation = activeDragState?.orientation ?? 'horizontal';
     const ignoreId = activeDragState?.vehicleId;
 
@@ -69,8 +69,8 @@ export const Board: React.FC<BoardProps> = ({
     const col = Math.round((x - offsetX) / CELL_SIZE);
     const row = Math.round((y - offsetY) / CELL_SIZE);
 
-    const len = type === 'car' ? 2 : 3;
-    const valid = isValidPlacement({ row, col, orientation, type }, vehicles, ignoreId);
+    const len = length;
+    const valid = isValidPlacement({ row, col, orientation, length }, vehicles, ignoreId);
 
     const candidateCells: Array<{ row: number; col: number }> = [];
     for (let i = 0; i < len; i++) {
@@ -98,7 +98,7 @@ export const Board: React.FC<BoardProps> = ({
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
-    let type: VehicleType = activeDragState?.type ?? 'car';
+    let length: 2 | 3 = activeDragState?.length ?? 2;
     let orientation: Orientation = activeDragState?.orientation ?? 'horizontal';
     let offsetX = activeDragState?.offsetX ?? (CELL_SIZE / 2);
     let offsetY = activeDragState?.offsetY ?? (CELL_SIZE / 2);
@@ -108,7 +108,8 @@ export const Board: React.FC<BoardProps> = ({
       const dataStr = e.dataTransfer.getData('application/json');
       if (dataStr) {
         const parsed = JSON.parse(dataStr);
-        if (parsed.type) type = parsed.type;
+        if (parsed.length) length = parsed.length;
+        else if (parsed.type) length = parsed.type === 'truck' ? 3 : 2;
         if (parsed.orientation) orientation = parsed.orientation;
         if (typeof parsed.offsetX === 'number') offsetX = parsed.offsetX;
         if (typeof parsed.offsetY === 'number') offsetY = parsed.offsetY;
@@ -121,12 +122,12 @@ export const Board: React.FC<BoardProps> = ({
     const col = Math.round((x - offsetX) / CELL_SIZE);
     const row = Math.round((y - offsetY) / CELL_SIZE);
 
-    if (isValidPlacement({ row, col, orientation, type }, vehicles, vehicleId)) {
+    if (isValidPlacement({ row, col, orientation, length }, vehicles, vehicleId)) {
       soundManager.playSnapSound();
       if (vehicleId && onRelocateVehicle) {
         onRelocateVehicle(vehicleId, row, col);
       } else {
-        onPlaceVehicle({ type, orientation, row, col });
+        onPlaceVehicle({ length, orientation, row, col });
       }
     } else {
       soundManager.playBlockedSound();
@@ -257,21 +258,26 @@ export const Board: React.FC<BoardProps> = ({
             className="absolute inset-0 pointer-events-none z-10"
             style={{ width: `${BOARD_PIXEL_SIZE}px`, height: `${BOARD_PIXEL_SIZE}px` }}
           >
-            {vehicles.map((v) => (
-              <VehiclePiece
-                key={v.id}
-                vehicle={v}
-                mode={mode}
-                cellSize={CELL_SIZE}
-                gapSize={0}
-                nextMove={nextMove}
-                onMoveOneStep={onMoveOneStep}
-                onRemove={onRemoveVehicle}
-                isExitingWin={v.isTarget && isWinningSequence}
-                onDragStartExisting={onDragStartExisting}
-                onDragEndExisting={onDragEndExisting}
-              />
-            ))}
+            {vehicles.map((v) => {
+              const len = v.length;
+              const winningCol = 6 - len;
+              const isExiting = v.row === 2 && v.orientation === 'horizontal' && v.col >= winningCol && isWinningSequence;
+              return (
+                <VehiclePiece
+                  key={v.id}
+                  vehicle={v}
+                  mode={mode}
+                  cellSize={CELL_SIZE}
+                  gapSize={0}
+                  nextMove={nextMove}
+                  onMoveOneStep={onMoveOneStep}
+                  onRemove={onRemoveVehicle}
+                  isExitingWin={isExiting}
+                  onDragStartExisting={onDragStartExisting}
+                  onDragEndExisting={onDragEndExisting}
+                />
+              );
+            })}
           </div>
         </div>
 
